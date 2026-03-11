@@ -1,0 +1,70 @@
+# abyss - RAG (Retrieval-Augmented Generation) MCP Server Dependencies
+# Abyss is a semantic code/document search engine with local embeddings and ChromaDB vector storage.
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Configuration & Server Framework
+# ═══════════════════════════════════════════════════════════════════════════
+
+# YAML configuration file parsing for config.yaml
+PyYAML>=6.0
+
+# Model Context Protocol (MCP) server framework - enables Claude/IDE integration
+mcp>=1.0
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Indexing & Chunking Pipeline (LlamaIndex)
+# ═══════════════════════════════════════════════════════════════════════════
+
+# LlamaIndex core: orchestrates document parsing, chunking, embedding, and vector storage
+llama-index-core>=0.11
+
+# File readers: extracts text from PDF, DOCX, PPTX, EPUB, CSV, images, and JSON documents
+llama-index-readers-file
+
+# Hugging Face embeddings: integrates local sentence-transformers models (e.g., all-MiniLM-L6-v2)
+# Enables offline semantic search without external API calls
+llama-index-embeddings-huggingface
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Vector Database & Storage
+# ═══════════════════════════════════════════════════════════════════════════
+
+# ChromaDB: embedded SQLite-backed vector database for chunk storage and semantic search
+# Persists vectors locally without external infrastructure
+chromadb>=0.4
+
+# LlamaIndex integration: bridges LlamaIndex indexing pipeline with ChromaDB storage
+llama-index-vector-stores-chroma
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Code Analysis & SCIP Protocol
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Tree-sitter: syntax-aware AST parsing for multiple programming languages (C#, Python, Java, TypeScript, etc.)
+# Enables precise code structure extraction and language-specific metadata enrichment
+tree-sitter
+tree-sitter-language-pack
+
+# Protocol Buffers: serialization format for SCIP language indexing protocol
+# Required for scip_pb2.py code generation and protocol message handling
+protobuf>=4.0
+grpcio-tools
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Embeddings & Semantic Search
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Sentence-transformers: local pre-trained models for semantic embeddings (e.g., all-MiniLM-L6-v2)
+# Used indirectly via llama-index-embeddings-huggingface; provides 384-dimensional vectors
+sentence-transformers
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Document Format Support
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Openpyxl: read/write Excel (.xlsx) files for tabular data indexing
+openpyxl
+
+# MarkItDown: universal document converter (PDF, DOCX, PPTX, images → Markdown)
+# Essential for extracting clean text from office documents and scientific papers
+markitdown[all]

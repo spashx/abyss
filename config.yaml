@@ -1,0 +1,167 @@
+# ═══════════════════════════════════════════════════════════════════════════
+#  Abyss RAG MCP Server Configuration
+# ═══════════════════════════════════════════════════════════════════════════
+# This configuration file controls the behavior of the Abyss RAG MCP server.
+# Values defined here override built-in defaults.
+# If a value is missing, the built-in default from config.py will be used.
+
+# ───────────────────────────────────────────────────────────────────────────
+#  Supported File Extensions
+# ───────────────────────────────────────────────────────────────────────────
+
+# Source code extensions mapped to tree-sitter language
+code_extensions:
+  ".cs": csharp
+  ".py": python
+  ".java": java
+  ".ts": typescript
+  ".tsx": typescript
+  ".js": javascript
+  ".jsx": javascript
+  ".html": html
+  ".htm": html
+
+# Structured file extensions (JSON, XML, etc.)
+structured_extensions:
+  - ".json"
+  - ".xml"
+  - ".csproj"
+  - ".props"
+  - ".config"
+
+# Document file extensions (text, archives, office, etc.)
+document_extensions:
+  - ".md"
+  - ".txt"
+  - ".rst"
+  - ".pdf"
+  - ".docx"
+  - ".pptx"
+  - ".epub"
+  - ".ipynb"
+  - ".csv"
+  - ".png"
+  - ".jpg"
+  - ".jpeg"
+  - ".xlsx"
+
+# ───────────────────────────────────────────────────────────────────────────
+#  Extensions to Exclude from Indexing
+# ───────────────────────────────────────────────────────────────────────────
+# File extensions that should never be indexed, regardless of other settings.
+# Takes precedence over code_extensions / structured_extensions / document_extensions.
+# Example:
+#   exclude_extensions:
+#     - ".min.js"
+#     - ".g.cs"
+#     - ".designer.cs"
+exclude_extensions:
+  - ".bin"
+  - ".exe"
+  - ".dll"
+  - ".obj"
+  - ".pdb"
+
+# ───────────────────────────────────────────────────────────────────────────
+#  Directories to Exclude from Indexing
+# ───────────────────────────────────────────────────────────────────────────
+exclude_dirs:
+  - node_modules
+  - .git
+  - .svn
+  - .hg
+  - bin
+  - obj
+  - dist
+  - build
+  - .vs
+  - .idea
+  - __pycache__
+  - .mypy_cache
+  - .pytest_cache
+  - venv
+  - .venv
+  - .github
+  - .vscode
+  - Debug
+  - Release
+
+# ───────────────────────────────────────────────────────────────────────────
+#  SCIP Language Indexers
+# ───────────────────────────────────────────────────────────────────────────
+# Maps language names to their corresponding SCIP indexer commands
+scip_indexers:
+  dotnet: scip-dotnet
+  python: scip-python
+  java: scip-java
+  typescript: scip-typescript
+  javascript: scip-typescript
+
+# ───────────────────────────────────────────────────────────────────────────
+#  ChromaDB Storage Configuration
+# ───────────────────────────────────────────────────────────────────────────
+
+# Directory where ChromaDB persists its SQLite database.
+# Relative paths are resolved from the working directory at startup.
+# Can be overridden at runtime with the CHROMA_PERSIST_DIR environment variable.
+chroma_persist_dir: "data/chroma_db"
+
+# ───────────────────────────────────────────────────────────────────────────
+#  Embedding Model Configuration
+# ───────────────────────────────────────────────────────────────────────────
+
+# Sentence-transformers model used for both indexing and querying.
+# Must be the SAME model for both pipeline and query engine
+# so that index vectors and query vectors are in the same vector space.
+embedding_model_name: "sentence-transformers/all-MiniLM-L6-v2"
+
+# Local directory where the embedding model snapshot is cached.
+# EmbeddingService downloads the model here on first use and reloads from
+# this directory on subsequent starts (no outbound network call).
+# Relative paths are resolved from the project root.
+# Default: data/models
+embedding_cache_dir: "data/models"
+
+# Chunk overlap as a fraction of chunk_size.
+# chunk_overlap = int(chunk_size * chunk_overlap_ratio)
+# Example: for all-MiniLM-L6-v2 (max_seq_length=256),
+# chunk_size=1024, chunk_overlap=204 (0.2 * 1024)
+chunk_overlap_ratio: 0.2
+
+# ───────────────────────────────────────────────────────────────────────────
+#  EmbedBuilder Debug Mode
+# ───────────────────────────────────────────────────────────────────────────
+
+# When enabled, EmbedBuilder exports one HTML debug file per source file.
+# Each file is named after the source file: e.g. "toto.cs.html"
+# Useful for post-mortem analysis of chunking and metadata quality.
+embed_builder_debug: false
+
+# Directory where per-source-file HTML debug reports are written.
+# The directory is created automatically if it does not exist.
+embed_builder_debug_output_dir: "logs/EmbedBuilder"
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  Logging Configuration (Verbosity Control)
+# ═══════════════════════════════════════════════════════════════════════════
+# These settings control the verbosity of logs written to stderr and the log file.
+# Valid values: "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"
+# 
+# Note: File logging (abyss.log) always captures DEBUG and above, regardless of
+# the stderr log level below. Use these settings to control what you see in stderr.
+
+# Root logger level: controls all logs to stderr (abyss + Python stdlib).
+# Use DEBUG for detailed troubleshooting, INFO for normal operation.
+abyss_log_level: "INFO"
+
+# Chromadb module logger level: reduces noise from vector database operations.
+# ChromaDB can be verbose during indexing; set to WARNING to see only errors.
+chromadb_log_level: "INFO"
+
+# HTTPX (HTTP client) logger level: reduces noise from network requests.
+# HTTPx logs every request/response at DEBUG; use INFO or WARNING for clean output.
+httpx_log_level: "INFO"
+
+# LlamaIndex node parser logger level: reduces noise from text chunking.
+# The node parser logs every chunk created; set to WARNING to suppress chunking spam.
+llama_index_log_level: "INFO"
