@@ -1,0 +1,1302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ILSpy Search Feature Analysis</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --navy:    #1e3a5f;
+      --navy-lt: #2a5298;
+      --slate:   #3c5a7a;
+      --accent:  #4e9af1;
+      --bg:      #f9fafb;
+      --white:   #ffffff;
+      --border:  #d0d7e2;
+      --text:    #1a1a2e;
+      --code-bg: #eef2f7;
+      --crud-c:  #28a745;
+      --crud-r:  #007bff;
+      --crud-u:  #fd7e14;
+      --crud-d:  #dc3545;
+      --warn:    #e07b00;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--navy);
+      color: var(--white);
+      padding: 2.5rem 3rem 2rem;
+      border-bottom: 4px solid var(--accent);
+    }
+    header h1 { font-size: 2rem; font-weight: 700; letter-spacing: -.5px; }
+    header p  { margin-top: .4rem; opacity: .80; font-size: .95rem; }
+    .meta-grid {
+      display: flex; gap: 2rem; flex-wrap: wrap; margin-top: 1.2rem;
+    }
+    .meta-grid span {
+      background: rgba(255,255,255,.12);
+      border-radius: 4px; padding: .2rem .7rem;
+      font-size: .82rem;
+    }
+
+    /* ── Layout ── */
+    .layout { display: flex; }
+
+    nav {
+      width: 240px; min-width: 240px;
+      background: var(--navy);
+      color: var(--white);
+      padding: 1.5rem 0;
+      position: sticky; top: 0; height: 100vh; overflow-y: auto;
+    }
+    nav h2 { font-size: .7rem; text-transform: uppercase; letter-spacing: 1px;
+              opacity: .5; padding: 0 1.2rem .5rem; }
+    nav ul { list-style: none; }
+    nav ul li a {
+      display: block; padding: .45rem 1.2rem;
+      color: rgba(255,255,255,.75); text-decoration: none; font-size: .88rem;
+      transition: background .15s, color .15s;
+    }
+    nav ul li a:hover, nav ul li a.active {
+      background: rgba(255,255,255,.12); color: var(--white);
+    }
+    nav ul li.sub a { padding-left: 2rem; font-size: .83rem; }
+
+    main {
+      flex: 1; padding: 2.5rem 3rem;
+      max-width: calc(100% - 240px);
+    }
+
+    /* ── Sections ── */
+    section { margin-bottom: 3.5rem; }
+    h2 {
+      font-size: 1.55rem; font-weight: 700; color: var(--navy);
+      border-bottom: 2px solid var(--accent); padding-bottom: .4rem;
+      margin-bottom: 1.2rem;
+    }
+    h3 { font-size: 1.15rem; color: var(--slate); margin: 1.5rem 0 .6rem; }
+    h4 { font-size: 1rem; color: var(--navy); margin: 1.2rem 0 .4rem; }
+    p  { margin-bottom: .8rem; }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--white);
+      border: 1px solid var(--border); border-radius: 8px;
+      padding: 1.2rem 1.4rem; margin-bottom: 1.2rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    }
+    .card-title { font-weight: 700; color: var(--navy); font-size: 1rem; }
+    .card-subtitle { font-size: .82rem; opacity: .65; margin-top: .1rem; }
+
+    /* ── Tags / Pills ── */
+    .tag {
+      display: inline-block; border-radius: 3px;
+      padding: .1rem .5rem; font-size: .75rem; font-weight: 600;
+      margin-right: .25rem; vertical-align: middle;
+    }
+    .tag-primary  { background: #dce8ff; color: var(--navy-lt); }
+    .tag-strategy { background: #e8f5e9; color: #1b5e20; }
+    .tag-result   { background: #fff3e0; color: #e65100; }
+    .tag-model    { background: #f3e5f5; color: #4a148c; }
+    .tag-secondary{ background: #eceff1; color: #37474f; }
+    .tag-interface{ background: #e0f7fa; color: #006064; }
+
+    /* ── CRUD badges ── */
+    .crud { display: inline-block; border-radius: 3px; padding: .05rem .45rem;
+            font-size: .72rem; font-weight: 700; }
+    .C { background:#d4edda; color:var(--crud-c); }
+    .R { background:#cce5ff; color:var(--crud-r); }
+    .U { background:#ffe5cc; color:var(--crud-u); }
+    .D { background:#f8d7da; color:var(--crud-d); }
+
+    /* ── Tables ── */
+    .table-wrap { overflow-x: auto; margin-bottom: 1.2rem; }
+    table { border-collapse: collapse; width: 100%; font-size: .87rem; }
+    thead { background: var(--slate); color: var(--white); }
+    thead th { padding: .55rem .8rem; text-align: left; }
+    tbody tr:nth-child(even) { background: #f0f4f8; }
+    tbody td { padding: .5rem .8rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+    .highlight-row { background: #fef9ec !important; }
+
+    /* ── Code ── */
+    code { background: var(--code-bg); padding: .1rem .35rem;
+           border-radius: 3px; font-size: .85em;
+           font-family: "Cascadia Code","Fira Code",monospace; }
+    pre  { background: var(--code-bg); border: 1px solid var(--border);
+           border-radius: 6px; padding: 1rem 1.2rem; overflow-x: auto;
+           font-size: .83rem; font-family: "Cascadia Code","Fira Code",monospace;
+           margin: .8rem 0 1rem; line-height: 1.55; }
+
+    /* ── Admonitions ── */
+    .note, .warn, .sec {
+      border-left: 4px solid; border-radius: 0 6px 6px 0;
+      padding: .7rem 1rem; margin-bottom: 1rem; font-size: .9rem;
+    }
+    .note { border-color: var(--accent); background: #eff6ff; }
+    .warn { border-color: var(--warn);   background: #fff8ed; }
+    .sec  { border-color: var(--crud-d); background: #fff5f5; }
+
+    /* ── Mermaid container ── */
+    .mermaid-wrap {
+      background: var(--white); border: 1px solid var(--border);
+      border-radius: 8px; padding: 1.5rem; margin: 1.2rem 0; overflow-x: auto;
+    }
+    .mermaid-wrap figcaption {
+      text-align: center; font-size: .82rem; opacity: .65; margin-top: .6rem;
+    }
+    .mermaid { min-height: 200px; }
+
+    /* ── Quality gate badges ── */
+    .qg-pass { color: var(--crud-c); font-weight: 700; }
+    .qg-pending { color: var(--warn); font-weight: 700; }
+
+    /* ── Stat row ── */
+    .stat-row { display: flex; gap: 1.2rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+    .stat-box {
+      background: var(--white); border: 1px solid var(--border);
+      border-radius: 8px; padding: .9rem 1.3rem; flex: 1; min-width: 130px;
+      text-align: center;
+    }
+    .stat-num { font-size: 2rem; font-weight: 700; color: var(--navy); }
+    .stat-lbl { font-size: .78rem; opacity: .65; }
+
+    /* ── Responsive ── */
+    @media (max-width: 860px) {
+      .layout { flex-direction: column; }
+      nav { width: 100%; height: auto; position: relative; }
+      main { max-width: 100%; padding: 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>ILSpy &mdash; Search Feature Analysis</h1>
+  <p>Deep-dive architecture and behavioural analysis of the ILSpy Search subsystem, produced via Abyss code-intelligence queries.</p>
+  <div class="meta-grid">
+    <span>Target: <strong>ICSharpCode.ILSpy</strong></span>
+    <span>Namespace: <strong>ICSharpCode.ILSpy.Search</strong></span>
+    <span>Language: <strong>C# / WPF</strong></span>
+    <span>Entities discovered: <strong>30</strong></span>
+    <span>Abyss queries executed: <strong>10</strong></span>
+    <span>Analysis date: <strong>2025</strong></span>
+  </div>
+</header>
+
+<div class="layout">
+
+<!-- ─────────────────────── NAV ─────────────────────── -->
+<nav>
+  <h2>Contents</h2>
+  <ul>
+    <li><a href="#executive-summary">1. Executive Summary</a></li>
+    <li><a href="#entity-inventory">2. Entity Inventory</a></li>
+    <li class="sub"><a href="#primary-entities">Primary entities</a></li>
+    <li class="sub"><a href="#strategy-entities">Search strategies</a></li>
+    <li class="sub"><a href="#result-types">Result types</a></li>
+    <li class="sub"><a href="#data-models">Data models</a></li>
+    <li class="sub"><a href="#secondary-entities">Secondary entities</a></li>
+    <li><a href="#feature-ui">3. Search UI Pane</a></li>
+    <li><a href="#feature-model">4. Search Pane Model</a></li>
+    <li><a href="#feature-factory">5. Result Factory &amp; Parsing</a></li>
+    <li><a href="#diagrams">6. Architecture Diagrams</a></li>
+    <li class="sub"><a href="#class-diagram">Class diagram</a></li>
+    <li class="sub"><a href="#seq-search">WF1: Search entry</a></li>
+    <li class="sub"><a href="#seq-filter">WF2: Filter change</a></li>
+    <li class="sub"><a href="#seq-nav">WF3: Navigation</a></li>
+    <li><a href="#crud-table">7. CRUD Reference</a></li>
+    <li><a href="#recommendations">8. Recommendations</a></li>
+    <li class="sub"><a href="#quality-recs">Quality</a></li>
+    <li class="sub"><a href="#security-recs">Security</a></li>
+    <li><a href="#appendix">9. Evidence Appendix</a></li>
+  </ul>
+</nav>
+
+<!-- ─────────────────────── MAIN ─────────────────────── -->
+<main>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- §1 EXECUTIVE SUMMARY -->
+<!-- ═══════════════════════════════════════════════ -->
+<section id="executive-summary">
+  <h2>1. Executive Summary</h2>
+
+  <div class="stat-row">
+    <div class="stat-box"><div class="stat-num">30</div><div class="stat-lbl">Entities discovered</div></div>
+    <div class="stat-box"><div class="stat-num">6</div><div class="stat-lbl">Primary classes</div></div>
+    <div class="stat-box"><div class="stat-num">7</div><div class="stat-lbl">Strategy classes</div></div>
+    <div class="stat-box"><div class="stat-num">12</div><div class="stat-lbl">Search modes</div></div>
+    <div class="stat-box"><div class="stat-num">3</div><div class="stat-lbl">User workflows</div></div>
+    <div class="stat-box"><div class="stat-num">1,000</div><div class="stat-lbl">Max results (const)</div></div>
+  </div>
+
+  <p>
+    The ILSpy Search subsystem provides interactive, incremental searching across all loaded assemblies.
+    It follows a classic <strong>MVVM / strategy / factory</strong> layering pattern within a WPF application:
+  </p>
+  <ul style="margin: .5rem 0 1rem 1.5rem; line-height: 2;">
+    <li><strong>SearchPane</strong> (UserControl + code-behind) acts as the UI orchestrator and owns the <code>RunningSearch</code> lifecycle.</li>
+    <li><strong>RunningSearch</strong> encapsulates one asynchronous search execution: parsing user input, selecting a strategy, running background tasks, and feeding a <code>ConcurrentQueue</code>.</li>
+    <li><strong>SearchPaneModel</strong> exposes bindable state (SearchTerm, SearchModes) and integrates with the docking system and session settings.</li>
+    <li><strong>AbstractSearchStrategy</strong> hierarchy (7 concrete classes) cleanly separates how each of 12 modes searches the metadata.</li>
+    <li><strong>SearchResultFactory</strong> produces typed results (<code>Member</code>, <code>Resource</code>, <code>Assembly</code>, <code>Namespace</code>) from domain objects.</li>
+    <li>Inter-component coordination uses a static <strong>MessageBus&lt;T&gt;</strong> (pub/sub), keeping components loosely coupled.</li>
+  </ul>
+
+  <div class="note">
+    <strong>Key Architectural Insight:</strong>  The rendering loop (<code>CompositionTarget.Rendering</code>) drives result insertion
+    into <code>Results: ObservableCollection&lt;SearchResult&gt;</code>, capped at <code>MAX_REFRESH_TIME_MS = 10 ms</code> per frame.
+    This decouples the background search Task from UI updates without an explicit timer or dispatcher.
+  </div>
+
+  <h3>Quality Gate Summary</h3>
+  <table>
+    <thead><tr><th>Gate</th><th>Criterion</th><th>Result</th></tr></thead>
+    <tbody>
+      <tr><td>QG-1</td><td>≥ 8 Abyss queries executed</td><td class="qg-pass">✔ PASS (10)</td></tr>
+      <tr><td>QG-2</td><td>≥ 6 primary entities with file/symbol</td><td class="qg-pass">✔ PASS (6 primary + 7 strategy + 4 result)</td></tr>
+      <tr><td>QG-3</td><td>≥ 3 complete workflows with CRUD</td><td class="qg-pass">✔ PASS (3)</td></tr>
+      <tr><td>QG-4</td><td>≥ 4 Mermaid diagrams (class + sequence)</td><td class="qg-pass">✔ PASS (4)</td></tr>
+      <tr><td>QG-5</td><td>≥ 5 quality + ≥ 3 security recommendations</td><td class="qg-pass">✔ PASS (5 + 5)</td></tr>
+    </tbody>
+  </table>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- §2 ENTITY INVENTORY -->
+<!-- ═══════════════════════════════════════════════ -->
+<section id="entity-inventory">
+  <h2>2. Entity Inventory</h2>
+
+  <!-- ── PRIMARY ── -->
+  <h3 id="primary-entities">2.1 Primary Entities (Search/ folder)</h3>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th><th>Entity</th><th>Kind</th><th>File</th><th>Responsibility</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="highlight-row">
+          <td>1</td>
+          <td><code>SearchPane</code> <span class="tag tag-primary">PRIMARY</span></td>
+          <td>UserControl</td>
+          <td><code>Search/SearchPane.xaml.cs</code></td>
+          <td>Top-level UI control. Owns search box, results listbox, progress bar, mode selector. Orchestrates <code>RunningSearch</code> lifecycle. Subscribes to <code>MessageBus</code> and <code>CompositionTarget.Rendering</code>.</td>
+        </tr>
+        <tr class="highlight-row">
+          <td>2</td>
+          <td><code>RunningSearch</code> <span class="tag tag-primary">PRIMARY</span></td>
+          <td>sealed class (nested)</td>
+          <td><code>Search/SearchPane.xaml.cs</code></td>
+          <td>Encapsulates one search execution. Parses input, selects strategy, runs <code>Task.Factory.StartNew(LongRunning)</code>, feeds <code>ConcurrentQueue&lt;SearchResult&gt;</code>. Cancellable via <code>CancellationTokenSource</code>.</td>
+        </tr>
+        <tr class="highlight-row">
+          <td>3</td>
+          <td><code>SearchPaneModel</code> <span class="tag tag-primary">PRIMARY</span></td>
+          <td>class (ViewModel)</td>
+          <td><code>Search/SearchPaneModel.cs</code></td>
+          <td>Bindable ViewModel: <code>SearchTerm</code> (MVVM <code>SetProperty</code>), <code>SearchModes[12]</code>, session settings integration. Subscribes to <code>ShowSearchPageEventArgs</code> and <code>ApplySessionSettingsEventArgs</code>.</td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td><code>SearchModeModel</code> <span class="tag tag-primary">PRIMARY</span></td>
+          <td>class</td>
+          <td><code>Search/SearchPaneModel.cs</code></td>
+          <td>Data object representing one search mode: <code>Mode</code> (enum value), <code>Image</code>, <code>Name</code>. Bound to <code>SearchModeComboBox</code> ItemsSource.</td>
+        </tr>
+        <tr class="highlight-row">
+          <td>5</td>
+          <td><code>SearchResultFactory</code> <span class="tag tag-primary">PRIMARY</span></td>
+          <td>class</td>
+          <td><code>Search/SearchResultFactory.cs</code></td>
+          <td>Implements <code>ISearchResultFactory</code>. Creates typed results via overloaded <code>Create()</code>: MemberSearchResult, ResourceSearchResult, AssemblySearchResult, NamespaceSearchResult. Calculates fitness and resolves icons.</td>
+        </tr>
+        <tr>
+          <td>6</td>
+          <td><code>ISearchResultFactory</code> <span class="tag tag-interface">INTERFACE</span></td>
+          <td>interface</td>
+          <td><code>Search/</code></td>
+          <td>Contract for result factory. Enables testability — strategies receive the interface, not the concrete class.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ── STRATEGIES ── -->
+  <h3 id="strategy-entities">2.2 Search Strategies</h3>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>#</th><th>Strategy</th><th>Handles Modes</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>7</td><td><code>AbstractSearchStrategy</code> <span class="tag tag-strategy">BASE</span></td><td>—</td><td>Abstract base with <code>Search(PEFile module, CancellationToken ct)</code>. Injects <code>SearchRequest</code> + <code>ISearchResultFactory</code>.</td></tr>
+        <tr><td>8</td><td><code>MemberSearchStrategy</code> <span class="tag tag-strategy">STRATEGY</span></td><td>TypeAndMember, Type, Member, Method, Field, Property, Event</td><td>Most general; searches metadata entities. Supports <code>OmitGenerics</code>, <code>FullNameSearch</code>.</td></tr>
+        <tr><td>9</td><td><code>LiteralSearchStrategy</code> <span class="tag tag-strategy">STRATEGY</span></td><td>Literal</td><td>Searches constant/literal values in metadata.</td></tr>
+        <tr><td>10</td><td><code>MetadataTokenSearchStrategy</code> <span class="tag tag-strategy">STRATEGY</span></td><td>Token</td><td>Parses <code>@0x...</code> prefix, matches raw metadata tokens. High precision.</td></tr>
+        <tr><td>11</td><td><code>ResourceSearchStrategy</code> <span class="tag tag-strategy">STRATEGY</span></td><td>Resource</td><td>Iterates assembly resources, matches by name.</td></tr>
+        <tr><td>12</td><td><code>AssemblySearchStrategy</code> <span class="tag tag-strategy">STRATEGY</span></td><td>Assembly</td><td>Searches assembly names/versions/attributes. Supports <code>AssemblySearchKind</code> sub-filter.</td></tr>
+        <tr><td>13</td><td><code>NamespaceSearchStrategy</code> <span class="tag tag-strategy">STRATEGY</span></td><td>Namespace</td><td>Searches namespace names. Respects <code>InNamespace</code> constraint.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ── RESULT TYPES ── -->
+  <h3 id="result-types">2.3 Result Types</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>#</th><th>Type</th><th>Created by</th><th>Key properties</th></tr></thead>
+      <tbody>
+        <tr><td>14</td><td><code>SearchResult</code> <span class="tag tag-result">BASE</span></td><td>—</td><td><code>Fitness: float</code>, <code>Name: string</code>, <code>Assembly: string</code>, <code>Reference: object</code>, <code>ComparerByFitness</code>, <code>ComparerByName</code></td></tr>
+        <tr><td>15</td><td><code>MemberSearchResult</code> <span class="tag tag-result">RESULT</span></td><td><code>Create(IEntity)</code></td><td>Adds member-specific icon, language name, decompiled display.</td></tr>
+        <tr><td>16</td><td><code>ResourceSearchResult</code> <span class="tag tag-result">RESULT</span></td><td><code>Create(MetadataFile, Resource, ...)</code></td><td>Carries resource node reference for tree view navigation.</td></tr>
+        <tr><td>17</td><td><code>AssemblySearchResult</code> <span class="tag tag-result">RESULT</span></td><td><code>Create(MetadataFile)</code></td><td>Represents a matching assembly. <code>Assembly</code> is the assembly itself.</td></tr>
+        <tr><td>18</td><td><code>NamespaceSearchResult</code> <span class="tag tag-result">RESULT</span></td><td><code>Create(MetadataFile, INamespace)</code></td><td>Wraps namespace node for tree navigation.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ── DATA MODELS ── -->
+  <h3 id="data-models">2.4 Data Models</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>#</th><th>Type</th><th>Key Fields</th></tr></thead>
+      <tbody>
+        <tr class="highlight-row">
+          <td>19</td>
+          <td><code>SearchRequest</code> <span class="tag tag-model">MODEL</span></td>
+          <td>
+            <code>Keywords: string[]</code>, <code>RegEx: Regex</code>, <code>Mode: SearchMode</code>,
+            <code>InNamespace: string</code>, <code>InAssembly: string</code>,
+            <code>AssemblySearchKind</code>, <code>MemberSearchKind</code>,
+            <code>FullNameSearch: bool</code>, <code>OmitGenerics: bool</code>,
+            <code>SearchResultFactory: ISearchResultFactory</code>,
+            <code>TreeNodeFactory: ITreeNodeFactory</code>,
+            <code>DecompilerSettings</code>
+          </td>
+        </tr>
+        <tr>
+          <td>20</td>
+          <td><code>SearchMode</code> <span class="tag tag-model">ENUM</span></td>
+          <td>TypeAndMember, Type, Member, Method, Field, Property, Event, Literal, Token, Resource, Assembly, Namespace (12 values)</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ── SECONDARY ── -->
+  <h3 id="secondary-entities">2.5 Secondary / Supporting Entities</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>#</th><th>Entity</th><th>Location</th><th>Role in Search</th></tr></thead>
+      <tbody>
+        <tr><td>21</td><td><code>AssemblyTreeModel</code> <span class="tag tag-secondary">SECONDARY</span></td><td><code>AssemblyTree/</code></td><td>Provides <code>AssemblyList</code>, <code>CurrentLanguage</code>; receives <code>NavigateToReferenceEventArgs</code> and calls <code>JumpToReferenceAsync()</code>.</td></tr>
+        <tr><td>22</td><td><code>LanguageSettings</code> <span class="tag tag-secondary">SECONDARY</span></td><td><code>Options/ or Settings/</code></td><td>Its property-changed events trigger <code>SearchPane.UpdateFilter()</code> → restarts search with new language filter.</td></tr>
+        <tr><td>23</td><td><code>SettingsService</code> <span class="tag tag-secondary">SECONDARY</span></td><td><code>Services/</code></td><td>Provides <code>DisplaySettings.SortResults</code>, <code>SessionSettings</code>, <code>DecompilerSettings</code>.</td></tr>
+        <tr><td>24</td><td><code>NavigateToReferenceEventArgs</code> <span class="tag tag-secondary">SECONDARY</span></td><td><code>Messages/</code></td><td>Message bus payload for navigation; carries <code>Reference</code> and <code>inNewTabPage</code>.</td></tr>
+        <tr><td>25</td><td><code>NavigationState</code> <span class="tag tag-secondary">SECONDARY</span></td><td><code>Navigation/</code></td><td>Navigation history state: <code>TreeNodes</code>, <code>ViewState</code>, <code>TabPage</code>.</td></tr>
+        <tr><td>26</td><td><code>MessageBus&lt;T&gt;</code> <span class="tag tag-secondary">SECONDARY</span></td><td><code>Messages/ or Util/</code></td><td>Static pub/sub bus. <code>Send()</code> / <code>Subscribers +=</code>. Decouples SearchPane from AssemblyTreeModel.</td></tr>
+        <tr><td>27</td><td><code>EntityReference</code> <span class="tag tag-secondary">SECONDARY</span></td><td><code>Commands/</code></td><td>Typed reference to an entity in an assembly. Resolved by <code>AssemblyTreeModel</code>.</td></tr>
+        <tr><td>28</td><td><code>Pane</code> (static) <span class="tag tag-secondary">SECONDARY</span></td><td><code>ViewModels/PaneModel.cs</code></td><td>Provides <code>IsActiveProperty</code>, <code>IsVisibleProperty</code> (DependencyProperties) for docking integration.</td></tr>
+        <tr><td>29</td><td><code>Language</code> <span class="tag tag-secondary">SECONDARY</span></td><td><code>Languages/</code></td><td>Abstraction for IL, C#, VB etc. Affects display name generation in <code>SearchResultFactory</code>.</td></tr>
+        <tr><td>30</td><td><code>DecompilerTextView</code> <span class="tag tag-secondary">SECONDARY</span></td><td><code>TextView/</code></td><td>Final consumer of navigation events; decompiles and renders the selected entity.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- §3 FEATURE: SEARCH UI PANE -->
+<!-- ═══════════════════════════════════════════════ -->
+<section id="feature-ui">
+  <h2>3. Search UI Pane — <code>SearchPane</code></h2>
+
+  <div class="card">
+    <div class="card-title">SearchPane (UserControl)</div>
+    <div class="card-subtitle">File: <code>Search/SearchPane.xaml.cs</code></div>
+  </div>
+
+  <p>
+    <code>SearchPane</code> is the outermost orchestrator of the search feature. It is a WPF <code>UserControl</code>
+    with code-behind that manages the full search lifecycle from user input through asynchronous execution to
+    result display and navigation.
+  </p>
+
+  <h3>3.1 Constants &amp; State</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Identifier</th><th>Type</th><th>Value / Role</th></tr></thead>
+      <tbody>
+        <tr><td><code>MAX_RESULTS</code></td><td><code>const int</code></td><td><strong>1,000</strong>. Hard cap on results added to <code>Results</code>. Prevents UI freeze with large result sets.</td></tr>
+        <tr><td><code>MAX_REFRESH_TIME_MS</code></td><td><code>const int</code></td><td><strong>10 ms</strong>. Per-frame budget for <code>UpdateResults</code>. Drains <code>ResultQueue</code> until budget is spent.</td></tr>
+        <tr><td><code>Results</code></td><td><code>ObservableCollection&lt;SearchResult&gt;</code></td><td>Bound to results ListBox. Two-way reactive: adding to it causes WPF DataBinding to update the UI.</td></tr>
+        <tr><td><code>currentSearch</code></td><td><code>RunningSearch</code></td><td>Reference to the active search task. Replaced on each new search. Previous is cancelled before replacement.</td></tr>
+        <tr><td><code>resultsComparer</code></td><td><code>IComparer&lt;SearchResult&gt;</code></td><td>Set from <code>DisplaySettings.SortResults</code>. Determines insertion order into <code>Results</code>.</td></tr>
+        <tr><td><code>runSearchOnNextShow</code></td><td><code>bool</code></td><td>Deferred search flag — if the pane is hidden when a search is requested, it runs on next show.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>3.2 Event Subscriptions (Constructor)</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Event / Source</th><th>Handler</th><th>Effect</th></tr></thead>
+      <tbody>
+        <tr><td><code>MessageBus&lt;CurrentAssemblyListChangedEventArgs&gt;</code></td><td><code>CurrentAssemblyList_Changed()</code></td><td>Restarts search when assembly list changes (load/unload). <span class="crud U">U</span></td></tr>
+        <tr><td><code>MessageBus&lt;SettingsChangedEventArgs&gt;</code></td><td><code>Settings_PropertyChanged()</code></td><td>Calls <code>UpdateFilter()</code> → <code>StartSearch()</code> when language or display settings change.</td></tr>
+        <tr><td><code>CompositionTarget.Rendering</code></td><td><code>UpdateResults()</code></td><td>Runs every WPF render frame. Drains <code>ResultQueue</code> within <code>MAX_REFRESH_TIME_MS</code>. <span class="crud C">C</span></td></tr>
+        <tr><td><code>searchBox.TextChanged</code></td><td><code>SearchBox_TextChanged()</code></td><td>Triggers a new search on every keypress.</td></tr>
+        <tr><td><code>searchModeComboBox.SelectionChanged</code></td><td><code>SearchModeComboBox_SelectionChanged()</code></td><td>Restarts search with the newly selected mode.</td></tr>
+        <tr><td><code>listBox.MouseDoubleClick</code></td><td><code>ListBox_MouseDoubleClick()</code></td><td>Calls <code>JumpToSelectedItem()</code>, navigating in the same tab.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>3.3 Key Methods</h3>
+
+  <h4><code>StartSearch(string searchTerm)</code></h4>
+  <p>
+    The central orchestration method. Called whenever the search term, mode, or assembly list changes.
+  </p>
+  <pre>
+// Pseudocode reconstruction from Abyss evidence
+async void StartSearch(string searchTerm)
+{
+    currentSearch?.Cancel();                             // CRUD: D (cancel old)
+    Results.Clear();                                     // CRUD: D (clear UI)
+
+    resultsComparer = settingsService
+        .DisplaySettings.SortResults
+        ? SearchResult.ComparerByFitness
+        : SearchResult.ComparerByName;                   // CRUD: R (read settings)
+
+    var assemblies = assemblyTreeModel.AssemblyList
+                         .GetAllAssemblies();            // CRUD: R
+    var running = new RunningSearch(                     // CRUD: C (new search)
+        assemblies, searchTerm, searchMode,
+        language, languageVersion, apiVisibility,
+        treeNodeFactory, settingsService);
+
+    currentSearch = running;                             // CRUD: U (replace ref)
+    await running.Run();
+}</pre>
+
+  <h4><code>UpdateResults(object sender, EventArgs e)</code></h4>
+  <p>
+    Called by <code>CompositionTarget.Rendering</code> every frame. It drains <code>currentSearch.ResultQueue</code>
+    until <code>MAX_REFRESH_TIME_MS</code> is exceeded or <code>MAX_RESULTS</code> is reached.
+  </p>
+  <pre>
+void UpdateResults(object sender, EventArgs e)
+{
+    var search = currentSearch;
+    if (search == null) return;
+    var sw = Stopwatch.StartNew();
+    while (Results.Count < MAX_RESULTS && sw.ElapsedMilliseconds < MAX_REFRESH_TIME_MS)
+    {
+        if (!search.ResultQueue.TryTake(out var result)) break;
+        // Sorted insertion or append
+        Results.InsertSorted(result, resultsComparer);   // CRUD: C
+    }
+}</pre>
+
+  <h4><code>JumpToSelectedItem(bool inNewTabPage = false)</code></h4>
+  <p>
+    Navigates to the selected search result using the <code>MessageBus</code>.
+  </p>
+  <pre>
+void JumpToSelectedItem(bool inNewTabPage = false)
+{
+    var result = listBox.SelectedItem as SearchResult;   // CRUD: R
+    if (result == null) return;
+    MessageBus.Send(this,
+        new NavigateToReferenceEventArgs(                // CRUD: C
+            result.Reference, inNewTabPage));
+}</pre>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- §4 FEATURE: SEARCH PANE MODEL -->
+<!-- ═══════════════════════════════════════════════ -->
+<section id="feature-model">
+  <h2>4. Search Pane Model — <code>SearchPaneModel</code> &amp; <code>SearchModeModel</code></h2>
+
+  <div class="card">
+    <div class="card-title">SearchPaneModel (ViewModel)</div>
+    <div class="card-subtitle">File: <code>Search/SearchPaneModel.cs</code> | PaneContentId: <code>"searchPane"</code></div>
+  </div>
+
+  <p>
+    <code>SearchPaneModel</code> is the ViewModel layer for the search pane. It integrates with the docking
+    framework (AvalonDock or equivalent) and provides bindable properties consumed by <code>SearchPane.xaml</code>.
+  </p>
+
+  <h3>4.1 Bindable Properties</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Property</th><th>Type</th><th>Binding Pattern</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>SearchTerm</code></td>
+          <td><code>string</code></td>
+          <td>Two-way via <code>SetProperty(ref _searchTerm, value)</code> (ObservableObject / MVVM Toolkit). Setting it via ShowSearchPageEventArgs auto-populates the search box.</td>
+        </tr>
+        <tr>
+          <td><code>SearchModes</code></td>
+          <td><code>SearchModeModel[]</code></td>
+          <td>One-time bound to <code>searchModeComboBox.ItemsSource</code>. Contains all 12 modes.</td>
+        </tr>
+        <tr>
+          <td><code>SessionSettings</code></td>
+          <td><code>SessionSettings</code></td>
+          <td>Stores selected mode index between sessions. Persisted via <code>ApplySessionSettingsEventArgs</code>.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>4.2 The 12 Search Modes</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>#</th><th>Mode</th><th>Input Prefix</th><th>Strategy</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>TypeAndMember</td><td>(none)</td><td><code>MemberSearchStrategy</code></td></tr>
+        <tr><td>2</td><td>Type</td><td><code>t:</code> / <code>T</code> / <code>TM</code></td><td><code>MemberSearchStrategy</code></td></tr>
+        <tr><td>3</td><td>Member</td><td><code>m:</code> / <code>M</code></td><td><code>MemberSearchStrategy</code></td></tr>
+        <tr><td>4</td><td>Method</td><td><code>MD</code></td><td><code>MemberSearchStrategy</code></td></tr>
+        <tr><td>5</td><td>Field</td><td><code>F</code></td><td><code>MemberSearchStrategy</code></td></tr>
+        <tr><td>6</td><td>Property</td><td><code>P</code></td><td><code>MemberSearchStrategy</code></td></tr>
+        <tr><td>7</td><td>Event</td><td><code>E</code></td><td><code>MemberSearchStrategy</code></td></tr>
+        <tr><td>8</td><td>Literal</td><td><code>C</code></td><td><code>LiteralSearchStrategy</code></td></tr>
+        <tr><td>9</td><td>Token</td><td><code>@0x...</code></td><td><code>MetadataTokenSearchStrategy</code></td></tr>
+        <tr><td>10</td><td>Resource</td><td><code>R</code></td><td><code>ResourceSearchStrategy</code></td></tr>
+        <tr><td>11</td><td>Assembly</td><td><code>A</code> / <code>AF</code> / <code>AN</code></td><td><code>AssemblySearchStrategy</code></td></tr>
+        <tr><td>12</td><td>Namespace</td><td><code>N</code></td><td><code>NamespaceSearchStrategy</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>4.3 Message Bus Subscriptions</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Message Type</th><th>Handler Effect</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>ShowSearchPageEventArgs</code></td>
+          <td>Sets <code>SearchTerm</code> from the event, calls <code>Show()</code> to make the pane visible. Used by "Find in Assemblies" menu commands.</td>
+        </tr>
+        <tr>
+          <td><code>ApplySessionSettingsEventArgs</code></td>
+          <td>Reads current <code>SessionSettings.SelectedSearchMode</code> and restores the ComboBox selection for the current session.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- §5 FEATURE: RESULT FACTORY & PARSING -->
+<!-- ═══════════════════════════════════════════════ -->
+<section id="feature-factory">
+  <h2>5. Result Factory, Parsing &amp; Strategy Selection</h2>
+
+  <h3>5.1 <code>SearchResultFactory</code></h3>
+
+  <div class="card">
+    <div class="card-title">SearchResultFactory (implements ISearchResultFactory)</div>
+    <div class="card-subtitle">File: <code>Search/SearchResultFactory.cs</code></div>
+  </div>
+
+  <p>
+    The factory is instantiated per-search inside <code>RunningSearch.Parse()</code>, receiving the current
+    <code>Language</code> and settings. This means every search execution gets a factory with a fresh
+    language context — correct for multilingual display.
+  </p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Method</th><th>Input</th><th>Output</th><th>Key operations</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>Create(IEntity)</code></td>
+          <td>Any ICSharpCode.Decompiler type (type, method, field, …)</td>
+          <td><code>MemberSearchResult</code></td>
+          <td>Calls <code>CalculateFitness(entity, keywords)</code>, <code>GetLanguageSpecificName(entity)</code>, <code>GetIcon(entity)</code>. Sets <code>Assembly</code> from entity's module.</td>
+        </tr>
+        <tr>
+          <td><code>Create(MetadataFile, Resource, ITreeNode, ITreeNode)</code></td>
+          <td>Module + resource + tree nodes</td>
+          <td><code>ResourceSearchResult</code></td>
+          <td>Stores tree node reference for direct navigation.</td>
+        </tr>
+        <tr>
+          <td><code>Create(MetadataFile)</code></td>
+          <td>Module</td>
+          <td><code>AssemblySearchResult</code></td>
+          <td>Module becomes both the result subject and navigation target.</td>
+        </tr>
+        <tr>
+          <td><code>Create(MetadataFile, INamespace)</code></td>
+          <td>Module + namespace</td>
+          <td><code>NamespaceSearchResult</code></td>
+          <td>Namespace node used for tree navigation.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>5.2 <code>RunningSearch.Parse(string input)</code> — Prefix Syntax</h3>
+  <p>
+    The <code>Parse()</code> method is the user-facing query language for the search box.
+    It tokenizes the input using <code>CommandLineTools.CommandLineToArgumentArray()</code> and
+    then scans for known prefix tokens to build a structured <code>SearchRequest</code>.
+  </p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Prefix / Pattern</th><th>Effect on SearchRequest</th><th>Example</th></tr></thead>
+      <tbody>
+        <tr><td><code>@0x...</code></td><td>Sets <code>Mode = Token</code>, parses hex token</td><td><code>@0x02000001</code></td></tr>
+        <tr><td><code>INNAMESPACE:x</code></td><td>Sets <code>InNamespace = "x"</code></td><td><code>INNAMESPACE:System.IO List</code></td></tr>
+        <tr><td><code>INASSEMBLY:x</code></td><td>Sets <code>InAssembly = "x"</code></td><td><code>INASSEMBLY:mscorlib String</code></td></tr>
+        <tr><td><code>T</code> / <code>TM</code></td><td>Mode = Type / TypeAndMember (MemberSearchKind filter)</td><td><code>T: List</code></td></tr>
+        <tr><td><code>M</code> / <code>MD</code></td><td>Mode = Member / Method</td><td><code>MD: Dispose</code></td></tr>
+        <tr><td><code>F</code></td><td>Mode = Field</td><td><code>F: _value</code></td></tr>
+        <tr><td><code>P</code></td><td>Mode = Property</td><td><code>P: Count</code></td></tr>
+        <tr><td><code>E</code></td><td>Mode = Event</td><td><code>E: Clicked</code></td></tr>
+        <tr><td><code>C</code></td><td>Mode = Literal (constant)</td><td><code>C: 42</code></td></tr>
+        <tr><td><code>R</code></td><td>Mode = Resource</td><td><code>R: icon.png</code></td></tr>
+        <tr><td><code>N</code></td><td>Mode = Namespace</td><td><code>N: System.Linq</code></td></tr>
+        <tr><td><code>A</code> / <code>AF</code> / <code>AN</code></td><td>Mode = Assembly; AF = file name filter, AN = name filter</td><td><code>A: mscorlib</code></td></tr>
+        <tr><td><code>/pattern/</code></td><td>Sets <code>RegEx = new Regex(pattern)</code> (Mode stays as selected)</td><td><code>/^Get[A-Z]/</code></td></tr>
+        <tr><td>Other tokens</td><td>Appended to <code>Keywords[]</code></td><td><code>IEnumerable Contains</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>5.3 <code>RunningSearch.GetSearchStrategy(SearchRequest)</code></h3>
+  <p>
+    A factory method (not a pattern class) inside <code>RunningSearch</code> that maps <code>SearchMode</code>
+    to the appropriate <code>AbstractSearchStrategy</code> subclass:
+  </p>
+  <pre>
+AbstractSearchStrategy GetSearchStrategy(SearchRequest request) => request.Mode switch
+{
+    SearchMode.TypeAndMember => new MemberSearchStrategy(request, MemberSearchKind.TypeAndMember),
+    SearchMode.Type          => new MemberSearchStrategy(request, MemberSearchKind.Type),
+    SearchMode.Member        => new MemberSearchStrategy(request, MemberSearchKind.Member),
+    SearchMode.Method        => new MemberSearchStrategy(request, MemberSearchKind.Method),
+    SearchMode.Field         => new MemberSearchStrategy(request, MemberSearchKind.Field),
+    SearchMode.Property      => new MemberSearchStrategy(request, MemberSearchKind.Property),
+    SearchMode.Event         => new MemberSearchStrategy(request, MemberSearchKind.Event),
+    SearchMode.Literal       => new LiteralSearchStrategy(request),
+    SearchMode.Token         => new MetadataTokenSearchStrategy(request),
+    SearchMode.Resource      => new ResourceSearchStrategy(request),
+    SearchMode.Assembly      => new AssemblySearchStrategy(request),
+    SearchMode.Namespace     => new NamespaceSearchStrategy(request),
+    _                        => throw new ArgumentOutOfRangeException()
+};</pre>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- §6 DIAGRAMS -->
+<!-- ═══════════════════════════════════════════════ -->
+<section id="diagrams">
+  <h2>6. Architecture Diagrams</h2>
+
+  <!-- ── CLASS DIAGRAM ── -->
+  <h3 id="class-diagram">6.1 Class Diagram — Search Subsystem</h3>
+  <figure class="mermaid-wrap">
+    <div class="mermaid">
+classDiagram
+    direction TB
+
+    class SearchPane {
+        +ObservableCollection~SearchResult~ Results
+        -RunningSearch currentSearch
+        -AssemblyTreeModel assemblyTreeModel
+        -ITreeNodeFactory treeNodeFactory
+        -SettingsService settingsService
+        -int MAX_RESULTS
+        -int MAX_REFRESH_TIME_MS
+        +StartSearch(string) void
+        +JumpToSelectedItem(bool) void
+        +FocusSearchBox() void
+        +UpdateFilter() void
+        -UpdateResults(object, EventArgs) void
+        -SearchBox_TextChanged(object, TextChangedEventArgs) void
+        -SearchModeComboBox_SelectionChanged(object, SelectionChangedEventArgs) void
+        -ListBox_MouseDoubleClick(object, MouseButtonEventArgs) void
+    }
+
+    class RunningSearch {
+        &lt;&lt;sealed&gt;&gt;
+        +IProducerConsumerCollection~SearchResult~ ResultQueue
+        -CancellationTokenSource cts
+        -IList~LoadedAssembly~ assemblies
+        -SearchRequest searchRequest
+        +Cancel() void
+        +Run() Task
+        -Parse(string) SearchRequest
+        -GetSearchStrategy(SearchRequest) AbstractSearchStrategy
+    }
+
+    class SearchPaneModel {
+        +string SearchTerm
+        +SearchModeModel[] SearchModes
+        +SessionSettings SessionSettings
+        +string PaneContentId
+    }
+
+    class SearchModeModel {
+        +SearchMode Mode
+        +object Image
+        +string Name
+    }
+
+    class ISearchResultFactory {
+        &lt;&lt;interface&gt;&gt;
+        +Create(IEntity) MemberSearchResult
+        +Create(MetadataFile, Resource, ITreeNode, ITreeNode) ResourceSearchResult
+        +Create(MetadataFile) AssemblySearchResult
+        +Create(MetadataFile, INamespace) NamespaceSearchResult
+    }
+
+    class SearchResultFactory {
+        -Language language
+        -DecompilerSettings settings
+        +Create(IEntity) MemberSearchResult
+        +Create(MetadataFile, Resource, ITreeNode, ITreeNode) ResourceSearchResult
+        +Create(MetadataFile) AssemblySearchResult
+        +Create(MetadataFile, INamespace) NamespaceSearchResult
+        -CalculateFitness(IEntity) float
+        -GetLanguageSpecificName(IEntity) string
+        -GetIcon(IEntity) object
+    }
+
+    class AbstractSearchStrategy {
+        &lt;&lt;abstract&gt;&gt;
+        #SearchRequest request
+        #ISearchResultFactory factory
+        +Search(PEFile, CancellationToken) void
+    }
+
+    class MemberSearchStrategy {
+        -MemberSearchKind memberKind
+    }
+    class LiteralSearchStrategy
+    class MetadataTokenSearchStrategy
+    class ResourceSearchStrategy
+    class AssemblySearchStrategy
+    class NamespaceSearchStrategy
+
+    class SearchResult {
+        +float Fitness
+        +string Name
+        +string Assembly
+        +object Reference
+        +IComparer~SearchResult~ ComparerByFitness$
+        +IComparer~SearchResult~ ComparerByName$
+    }
+
+    class MemberSearchResult
+    class ResourceSearchResult
+    class AssemblySearchResult
+    class NamespaceSearchResult
+
+    class SearchRequest {
+        +string[] Keywords
+        +Regex RegEx
+        +SearchMode Mode
+        +string InNamespace
+        +string InAssembly
+        +bool FullNameSearch
+        +bool OmitGenerics
+        +ISearchResultFactory ResultFactory
+        +DecompilerSettings Settings
+    }
+
+    class MessageBus~T~ {
+        &lt;&lt;service&gt;&gt;
+        +Send(object, T) void$
+        +Subscribers EventHandler$
+    }
+
+    class AssemblyTreeModel {
+        +AssemblyList AssemblyList
+        +Language CurrentLanguage
+        +JumpToReferenceAsync(object, object, bool) Task
+    }
+
+    SearchPane "1" --o "0..1" RunningSearch : currentSearch
+    SearchPane --> MessageBus~T~ : publishes
+    SearchPane ..> AssemblyTreeModel : injects
+    SearchPaneModel "1" --o "*" SearchModeModel : SearchModes
+    RunningSearch --> SearchRequest : creates
+    RunningSearch --> AbstractSearchStrategy : creates
+    RunningSearch o-- SearchResult : ResultQueue
+    SearchResultFactory ..|> ISearchResultFactory
+    AbstractSearchStrategy --> ISearchResultFactory : uses
+    AbstractSearchStrategy --> SearchResult : enqueues
+    MemberSearchStrategy --|> AbstractSearchStrategy
+    LiteralSearchStrategy --|> AbstractSearchStrategy
+    MetadataTokenSearchStrategy --|> AbstractSearchStrategy
+    ResourceSearchStrategy --|> AbstractSearchStrategy
+    AssemblySearchStrategy --|> AbstractSearchStrategy
+    NamespaceSearchStrategy --|> AbstractSearchStrategy
+    MemberSearchResult --|> SearchResult
+    ResourceSearchResult --|> SearchResult
+    AssemblySearchResult --|> SearchResult
+    NamespaceSearchResult --|> SearchResult
+    AssemblyTreeModel --> MessageBus~T~ : subscribes
+    </div>
+    <figcaption>Fig. 1 — Full class diagram of the ILSpy Search subsystem</figcaption>
+  </figure>
+
+  <!-- ── SEQ 1 ── -->
+  <h3 id="seq-search">6.2 Sequence Diagram — WF1: Search Term Entry</h3>
+  <figure class="mermaid-wrap">
+    <div class="mermaid">
+sequenceDiagram
+    actor User
+    participant SB as searchBox (WPF)
+    participant SP as SearchPane
+    participant RS as RunningSearch
+    participant STRAT as AbstractSearchStrategy
+    participant SRF as SearchResultFactory
+    participant Q as ConcurrentQueue&lt;SearchResult&gt;
+    participant OC as ObservableCollection&lt;SearchResult&gt;
+
+    User->>SB: types characters
+    SB->>SP: TextChanged event
+    SP->>SP: SearchBox_TextChanged()
+    SP->>RS: currentSearch.Cancel()
+    note right of RS: cts.Cancel() signals CancellationToken
+    SP->>OC: Results.Clear()
+    SP->>RS: new RunningSearch(assemblies, term, mode, …)
+    RS->>RS: Parse(searchTerm)
+    RS->>SRF: new SearchResultFactory(language, settings)
+    RS-->>SP: RunningSearch instance
+    SP->>RS: await Run()
+    activate RS
+    RS->>STRAT: GetSearchStrategy(searchRequest)
+    STRAT-->>RS: concrete strategy
+    loop for each LoadedAssembly
+        RS->>STRAT: Search(module, cancellationToken)
+        loop for each matching entity
+            STRAT->>SRF: Create(entity)
+            SRF-->>STRAT: SearchResult (with Fitness)
+            STRAT->>Q: TryAdd(result)
+        end
+    end
+    deactivate RS
+    loop CompositionTarget.Rendering (every frame)
+        SP->>SP: UpdateResults()
+        SP->>Q: TryTake(out result)
+        Q-->>SP: SearchResult
+        SP->>OC: InsertSorted(result, comparer)
+        note right of OC: WPF binding updates ListBox
+    end
+    </div>
+    <figcaption>Fig. 2 — WF1: User types a search term → results appear in the ListBox</figcaption>
+  </figure>
+
+  <!-- ── SEQ 2 ── -->
+  <h3 id="seq-filter">6.3 Sequence Diagram — WF2: Filter / Mode Change</h3>
+  <figure class="mermaid-wrap">
+    <div class="mermaid">
+sequenceDiagram
+    actor User
+    participant CMB as SearchModeComboBox
+    participant SP as SearchPane
+    participant MB as MessageBus&lt;SettingsChangedEventArgs&gt;
+    participant LS as LanguageSettings
+    participant RS as RunningSearch
+
+    alt User changes mode in ComboBox
+        User->>CMB: select new mode
+        CMB->>SP: SelectionChanged event
+        SP->>SP: SearchModeComboBox_SelectionChanged()
+        SP->>SP: StartSearch(this.SearchTerm)
+    else Language / settings changed
+        LS->>MB: property changed
+        MB->>SP: SettingsChangedEventArgs
+        SP->>SP: Settings_PropertyChanged()
+        SP->>SP: UpdateFilter()
+        SP->>SP: StartSearch(this.SearchTerm)
+    end
+
+    SP->>RS: currentSearch.Cancel()
+    SP->>RS: new RunningSearch(assemblies, term, NEW_MODE, …)
+    note right of RS: new mode → different AbstractSearchStrategy
+    SP->>RS: await Run()
+    RS->>RS: GetSearchStrategy(searchRequest)
+    note right of RS: Returns different strategy for new SearchMode
+    RS-->>SP: results flow into ResultQueue
+    </div>
+    <figcaption>Fig. 3 — WF2: User changes search mode or application settings trigger a filter update</figcaption>
+  </figure>
+
+  <!-- ── SEQ 3 ── -->
+  <h3 id="seq-nav">6.4 Sequence Diagram — WF3: Result Selection &amp; Navigation</h3>
+  <figure class="mermaid-wrap">
+    <div class="mermaid">
+sequenceDiagram
+    actor User
+    participant LB as ListBox (results)
+    participant SP as SearchPane
+    participant MB as MessageBus&lt;NavigateToReferenceEventArgs&gt;
+    participant ATM as AssemblyTreeModel
+    participant TV as DecompilerTextView
+
+    User->>LB: double-click result
+    LB->>SP: MouseDoubleClick event
+    SP->>SP: ListBox_MouseDoubleClick()
+    SP->>SP: JumpToSelectedItem(inNewTabPage=false)
+    SP->>LB: SelectedItem as SearchResult
+    LB-->>SP: SearchResult (with Reference)
+    SP->>MB: Send(this, new NavigateToReferenceEventArgs(result.Reference, false))
+    MB->>ATM: NavigateToReferenceEventArgs delivered
+    ATM->>ATM: JumpToReferenceAsync(reference, source, inNewTabPage)
+    ATM->>ATM: Resolve EntityReference → assembly + entity
+    ATM->>ATM: FindTreeNode(entity)
+    ATM->>ATM: SelectNode(treeNode, inNewTabPage)
+    ATM->>TV: decompile and display selected entity
+    TV-->>User: decompiled code shown in text view
+
+    note over User, TV: Ctrl+click opens in new tab (inNewTabPage=true)
+    </div>
+    <figcaption>Fig. 4 — WF3: User selects a search result → navigates to decompiled entity</figcaption>
+  </figure>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- §7 CRUD REFERENCE -->
+<!-- ═══════════════════════════════════════════════ -->
+<section id="crud-table">
+  <h2>7. CRUD Reference Table</h2>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Workflow</th>
+          <th>Step</th>
+          <th>Operation</th>
+          <th>Entity / Resource</th>
+          <th>Code Location</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- WF1 -->
+        <tr><td rowspan="9">WF1 Search Entry</td>
+            <td>1</td><td><span class="crud D">D</span> Cancel</td><td><code>RunningSearch.cts</code></td><td><code>StartSearch()</code></td></tr>
+        <tr><td>2</td><td><span class="crud D">D</span> Clear</td><td><code>Results (ObservableCollection)</code></td><td><code>StartSearch()</code></td></tr>
+        <tr><td>3</td><td><span class="crud R">R</span> Read</td><td><code>DisplaySettings.SortResults</code></td><td><code>StartSearch()</code></td></tr>
+        <tr><td>4</td><td><span class="crud R">R</span> Read</td><td><code>AssemblyList.GetAllAssemblies()</code></td><td><code>StartSearch()</code></td></tr>
+        <tr><td>5</td><td><span class="crud C">C</span> Create</td><td><code>new RunningSearch(…)</code></td><td><code>StartSearch()</code></td></tr>
+        <tr><td>6</td><td><span class="crud C">C</span> Create</td><td><code>SearchRequest</code> (via <code>Parse()</code>)</td><td><code>RunningSearch.Parse()</code></td></tr>
+        <tr><td>7</td><td><span class="crud C">C</span> Create</td><td><code>AbstractSearchStrategy</code> subclass</td><td><code>GetSearchStrategy()</code></td></tr>
+        <tr><td>8</td><td><span class="crud C">C</span> Create</td><td><code>SearchResult</code> objects (via factory)</td><td><code>AbstractSearchStrategy.Search()</code></td></tr>
+        <tr><td>9</td><td><span class="crud C">C</span> Create</td><td>Results in <code>ObservableCollection</code></td><td><code>UpdateResults()</code></td></tr>
+
+        <!-- WF2 -->
+        <tr><td rowspan="4">WF2 Filter Change</td>
+            <td>1</td><td><span class="crud R">R</span> Read</td><td>Selected <code>SearchMode</code> from ComboBox</td><td><code>SelectionChanged handler</code></td></tr>
+        <tr><td>2</td><td><span class="crud D">D</span> Cancel</td><td>Previous <code>RunningSearch</code></td><td><code>StartSearch()</code></td></tr>
+        <tr><td>3</td><td><span class="crud C">C</span> Create</td><td>New <code>RunningSearch</code> with new mode</td><td><code>StartSearch()</code></td></tr>
+        <tr><td>4</td><td><span class="crud U">U</span> Update</td><td><code>SearchRequest.Mode</code></td><td><code>RunningSearch.Parse()</code></td></tr>
+
+        <!-- WF3 -->
+        <tr><td rowspan="5">WF3 Navigation</td>
+            <td>1</td><td><span class="crud R">R</span> Read</td><td><code>listBox.SelectedItem</code></td><td><code>JumpToSelectedItem()</code></td></tr>
+        <tr><td>2</td><td><span class="crud C">C</span> Create</td><td><code>NavigateToReferenceEventArgs</code></td><td><code>JumpToSelectedItem()</code></td></tr>
+        <tr><td>3</td><td><span class="crud R">R</span> Read</td><td>Resolved <code>EntityReference</code> → assembly</td><td><code>AssemblyTreeModel.JumpToReferenceAsync()</code></td></tr>
+        <tr><td>4</td><td><span class="crud R">R</span> Read</td><td>Tree node lookup (<code>FindTreeNode</code>)</td><td><code>AssemblyTreeModel</code></td></tr>
+        <tr><td>5</td><td><span class="crud U">U</span> Update</td><td>Active tree selection + text view content</td><td><code>SelectNode() + DecompilerTextView</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- §8 RECOMMENDATIONS -->
+<!-- ═══════════════════════════════════════════════ -->
+<section id="recommendations">
+  <h2>8. Recommendations</h2>
+
+  <!-- ── QUALITY ── -->
+  <h3 id="quality-recs">8.1 Quality Recommendations</h3>
+
+  <div class="card">
+    <div class="card-title">Q-01 — Single Responsibility Violation: <code>RunningSearch</code> nested in <code>SearchPane</code></div>
+    <div class="card-subtitle">Priority: Medium</div>
+    <p style="margin-top:.7rem">
+      <code>RunningSearch</code> is a <strong>sealed nested class inside <code>SearchPane.xaml.cs</code></strong>,
+      mixing UI lifecycle concerns with background-task orchestration. This tightly couples the execution engine
+      to the code-behind, making it impossible to unit-test without instantiating a WPF control.
+    </p>
+    <p><strong>Recommendation:</strong> Extract <code>RunningSearch</code> to its own internal file
+       (<code>RunningSearch.cs</code>) in the <code>Search/</code> folder. Introduce an
+       <code>IRunningSearch</code> interface for testability. This mirrors the existing pattern of
+       <code>ISearchResultFactory</code>.</p>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Q-02 — No Input Debouncing on Search Box</div>
+    <div class="card-subtitle">Priority: Medium</div>
+    <p style="margin-top:.7rem">
+      Every keystroke fires <code>SearchBox_TextChanged</code> → <code>StartSearch()</code> immediately.
+      For large assembly lists this creates unnecessary background tasks killed almost immediately.
+      The current <code>CancellationToken</code> approach mitigates the correctness problem but wastes
+      thread-pool resources and CPU.
+    </p>
+    <p><strong>Recommendation:</strong> Add a <code>DispatcherTimer</code> debounce (e.g. 200 ms delay)
+       before calling <code>StartSearch()</code>. The timer resets on each keypress and only fires when the
+       user pauses.</p>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Q-03 — <code>MAX_RESULTS</code> is a Hard-Coded Constant</div>
+    <div class="card-subtitle">Priority: Low</div>
+    <p style="margin-top:.7rem">
+      <code>MAX_RESULTS = 1000</code> is a compile-time constant with no user-configurable override.
+      Power users searching large codebases may need more results; casual users may prefer fewer for
+      performance.
+    </p>
+    <p><strong>Recommendation:</strong> Surface this as a setting in <code>DisplaySettings</code>
+       (alongside <code>SortResults</code>). Default to 1,000; allow range 100–5,000.</p>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Q-04 — <code>CompositionTarget.Rendering</code> Frame-Rate Dependency</div>
+    <div class="card-subtitle">Priority: Low</div>
+    <p style="margin-top:.7rem">
+      Result insertion runs every WPF render frame (targeting 60 fps). On high-refresh-rate displays (144 Hz)
+      <code>UpdateResults</code> is called 144 times per second instead of 60, spending more time draining
+      the queue but with no additional benefit. On slow machines the 10 ms budget may be insufficient.
+    </p>
+    <p><strong>Recommendation:</strong> Replace with a <code>DispatcherTimer</code> at a fixed interval
+       (e.g. 50 ms) or make <code>MAX_REFRESH_TIME_MS</code> adaptive based on measured frame time.</p>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Q-05 — <code>Parse()</code> Has No Formal Grammar / Unit Tests</div>
+    <div class="card-subtitle">Priority: Medium</div>
+    <p style="margin-top:.7rem">
+      The prefix language (<code>T:</code>, <code>INNAMESPACE:</code>, <code>@0x...</code>, <code>/regex/</code>)
+      is implemented ad-hoc in <code>Parse()</code>. Adding new prefixes risks silent regressions. There are no
+      visible unit tests for this method.
+    </p>
+    <p><strong>Recommendation:</strong> Extract Parse logic into a standalone <code>SearchQueryParser</code>
+       static class with an xUnit test suite covering: empty input, all prefixes, regex, combined
+       (e.g. <code>INNAMESPACE:Foo /Bar/</code>), and edge cases (unmatched <code>/</code>, empty prefix value).</p>
+  </div>
+
+  <!-- ── SECURITY ── -->
+  <h3 id="security-recs">8.2 Security Recommendations</h3>
+
+  <div class="sec">
+    <strong>S-01 — Regex Catastrophic Backtracking (ReDoS)</strong><br/>
+    <p style="margin-top:.5rem">
+      When the user enters a pattern via <code>/pattern/</code> syntax, <code>Parse()</code> creates a
+      <code>Regex</code> object from raw user input with no timeout. A malicious or accidental input like
+      <code>/(a+)+$/</code> can cause exponential backtracking, freezing the background search thread
+      (and consuming 100% CPU on that thread indefinitely, even after cancel if the regex is running).
+    </p>
+    <strong>Fix:</strong> Pass <code>RegexOptions.None</code> and a <code>TimeSpan</code> timeout to the
+    <code>Regex</code> constructor:
+    <pre>new Regex(pattern, RegexOptions.Compiled, matchTimeout: TimeSpan.FromSeconds(1))</pre>
+    Catch <code>RegexMatchTimeoutException</code> in the strategy and treat it as no-match. Validate pattern
+    length (&lt; 500 chars) before construction.
+  </div>
+
+  <div class="sec">
+    <strong>S-02 — No Search Term Length Limit</strong><br/>
+    <p style="margin-top:.5rem">
+      <code>SearchBox_TextChanged</code> passes the full text of the search box to <code>Parse()</code> without
+      any length check. A very long input (e.g. MB-sized paste) will be tokenized by
+      <code>CommandLineTools.CommandLineToArgumentArray()</code> and iterated multiple times, creating
+      large <code>Keywords[]</code> arrays. Combined with the regex issue above, this is a local DoS vector.
+    </p>
+    <strong>Fix:</strong> Add a guard at the top of <code>StartSearch()</code>:
+    <pre>if (searchTerm?.Length > 500) return;</pre>
+  </div>
+
+  <div class="sec">
+    <strong>S-03 — Unvalidated <code>EntityReference</code> Resolution</strong><br/>
+    <p style="margin-top:.5rem">
+      <code>AssemblyTreeModel.JumpToReferenceAsync()</code> resolves an <code>EntityReference</code> by
+      calling <code>ResolveAssembly(AssemblyList)</code>. If a crafted navigation message were injected via
+      <code>MessageBus</code> (possible if ILSpy ever processes external data such as XML workspace
+      files), an attacker-controlled reference could trigger arbitrary file load from disk.
+    </p>
+    <strong>Fix:</strong> Validate that the source <code>MetadataFile</code> belongs to the current
+    <code>AssemblyList</code> before resolving. Add a whitelist check on the resolved assembly path
+    (must be under known loaded paths).
+  </div>
+
+  <div class="sec">
+    <strong>S-04 — File Path Exposure in ToolTips</strong><br/>
+    <p style="margin-top:.5rem">
+      Search results display assembly paths in ToolTips. If ILSpy were embedded in another tool that
+      shows results to external parties, full file-system paths could leak sensitive deployment structure
+      (e.g. internal build server paths on CI-scanned assemblies).
+    </p>
+    <strong>Fix:</strong> For untrusted assembly sources, normalize displayed paths relative to a configured
+    base directory and avoid absolute paths in UI-visible strings.
+  </div>
+
+  <div class="sec">
+    <strong>S-05 — Metadata Reflection Without Validation in Token Search</strong><br/>
+    <p style="margin-top:.5rem">
+      <code>MetadataTokenSearchStrategy</code> accepts a raw hex token (<code>@0x...</code>) and uses it to
+      look up metadata in potentially untrusted assemblies. Negative or out-of-range token values passed to the
+      PEFile reader could trigger unhandled <code>BadImageFormatException</code> or access-violation-level
+      scenarios in native code paths within ICSharpCode.Decompiler.
+    </p>
+    <strong>Fix:</strong> Validate the parsed token against valid range (0x01000001–0x7fffffff) and
+    the table type byte before passing to the reader. Wrap the reader call in a try/catch for
+    <code>BadImageFormatException</code>.
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- §9 EVIDENCE APPENDIX -->
+<!-- ═══════════════════════════════════════════════ -->
+<section id="appendix">
+  <h2>9. Evidence Appendix — Abyss Query References</h2>
+
+  <p>
+    All findings in this report are grounded in Abyss code-intelligence queries against the indexed
+    ILSpy repository (293 documents, 1,746 chunks, 1,729 SCIP-enriched).
+    Each entry below shows the query, file evidence, and the key chunk excerpt used.
+  </p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Query #</th><th>Query Text (abbreviated)</th><th>Key Evidence File</th><th>Key Finding</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Q1</td>
+          <td><em>"SearchPane search pane UI model WPF"</em></td>
+          <td><code>Search/SearchPane.xaml.cs</code></td>
+          <td>Confirmed <code>MAX_RESULTS=1000</code>, <code>Results: ObservableCollection&lt;SearchResult&gt;</code>, constructor subscriptions to <code>MessageBus</code> and <code>CompositionTarget.Rendering</code>.</td>
+        </tr>
+        <tr>
+          <td>Q2</td>
+          <td><em>"SearchPaneModel search results binding observable SearchTerm"</em></td>
+          <td><code>Search/SearchPaneModel.cs</code></td>
+          <td>Confirmed <code>SearchTerm</code> with <code>SetProperty</code>, <code>SearchModes: SearchModeModel[12]</code>, <code>PaneContentId="searchPane"</code>, session settings restore.</td>
+        </tr>
+        <tr>
+          <td>Q3</td>
+          <td><em>"SearchResultFactory factory result creation filtering"</em></td>
+          <td><code>Search/SearchResultFactory.cs</code></td>
+          <td>Confirmed <code>ISearchResultFactory</code> interface and four <code>Create()</code> overloads with their return types. Confirmed <code>CalculateFitness()</code>, <code>GetLanguageSpecificName()</code>, <code>GetIcon()</code>.</td>
+        </tr>
+        <tr>
+          <td>Q4</td>
+          <td><em>"RunningSearch background task cancellation parallel"</em></td>
+          <td><code>Search/SearchPane.xaml.cs</code></td>
+          <td>Confirmed <code>CancellationTokenSource</code>, <code>ConcurrentQueue&lt;SearchResult&gt;</code> as <code>ResultQueue</code>, <code>Task.Factory.StartNew(LongRunning)</code> in <code>Run()</code>.</td>
+        </tr>
+        <tr>
+          <td>Q5</td>
+          <td><em>"ISearchResult SearchResult interface Fitness Name Assembly Reference"</em></td>
+          <td><code>Search/SearchResultFactory.cs</code></td>
+          <td>Confirmed <code>MemberSearchResult</code>, <code>AssemblySearchResult</code>, <code>NamespaceSearchResult</code> as distinct subtypes. <code>ComparerByFitness</code>, <code>ComparerByName</code> on <code>SearchResult</code>.</td>
+        </tr>
+        <tr>
+          <td>Q6</td>
+          <td><em>"AbstractSearchStrategy MemberSearchStrategy GetSearchStrategy"</em></td>
+          <td><code>Search/SearchPane.xaml.cs</code></td>
+          <td>Confirmed <code>GetSearchStrategy(SearchRequest)</code> factory method with full 12-way switch, strategy class names, and their mode mappings.</td>
+        </tr>
+        <tr>
+          <td>Q7</td>
+          <td><em>"UpdateResults render results display sort fitness"</em></td>
+          <td><code>Search/SearchPane.xaml.cs</code></td>
+          <td>Confirmed <code>CompositionTarget.Rendering += UpdateResults</code>, <code>MAX_REFRESH_TIME_MS=10</code>, sorted insertion into <code>Results</code> using <code>resultsComparer</code>.</td>
+        </tr>
+        <tr>
+          <td>Q8</td>
+          <td><em>"NavigateToReferenceEventArgs MessageBus navigation JumpToReferenceAsync"</em></td>
+          <td><code>AssemblyTree/AssemblyTreeModel.cs</code></td>
+          <td>Confirmed <code>JumpToReferenceAsync(object reference, object source, bool inNewTabPage)</code>. Confirmed <code>NavigationState</code> class, navigation pipeline to <code>DecompilerTextView</code>.</td>
+        </tr>
+        <tr>
+          <td>Q9</td>
+          <td><em>"Parse SearchRequest Keywords RegEx Mode INNAMESPACE INASSEMBLY"</em></td>
+          <td><code>Search/SearchPane.xaml.cs</code></td>
+          <td>Confirmed full prefix table: <code>@</code>=Token, <code>INNAMESPACE</code>, <code>INASSEMBLY</code>, <code>T/TM/M/MD/F/P/E/C/R/N/A/AF/AN</code>. Regex via <code>/pattern/</code>. Tokenizer: <code>CommandLineTools.CommandLineToArgumentArray()</code>.</td>
+        </tr>
+        <tr>
+          <td>Q10</td>
+          <td><em>"AssemblySearchStrategy ResourceSearchStrategy NamespaceSearchStrategy"</em></td>
+          <td><code>Search/</code> (multiple files)</td>
+          <td>Confirmed concrete strategy class names, their purpose, and that they each extend <code>AbstractSearchStrategy</code> and receive <code>SearchRequest</code> + <code>ISearchResultFactory</code>.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <strong>Reproducibility:</strong>  All queries were executed against Abyss MCP server with the ILSpy repository
+    indexed at <code>D:\repos\github\ILSpy\ILSpy</code> (293 documents, 1,746 chunks).
+    Filter used: <code>file_path contains "Search"</code> for primary entity queries.
+    Strategy and secondary entity queries used no file filter, relying on semantic relevance ranking.
+  </div>
+</section>
+
+</main>
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'default',
+    securityLevel: 'loose',
+    classDiagram: { useMaxWidth: false },
+    sequence: { useMaxWidth: false, showSequenceNumbers: true }
+  });
+
+  // Highlight active nav item based on scroll position
+  const sections = document.querySelectorAll('section[id]');
+  const navLinks = document.querySelectorAll('nav a');
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        navLinks.forEach(l => l.classList.remove('active'));
+        const active = document.querySelector(`nav a[href="#${entry.target.id}"]`);
+        if (active) active.classList.add('active');
+      }
+    });
+  }, { threshold: 0.25 });
+
+  sections.forEach(s => observer.observe(s));
+</script>
+</body>
+</html>
