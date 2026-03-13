@@ -17,7 +17,7 @@ For any information seach about ILSpy, ALWAYS USE IN PRIORITY the Abyss MCP serv
 
 # 2) ACTIONS TO PERFORM
 
-As an seasoned expert in C#/.NET programming and professionnal senior software architect, perform these tasks:
+As a seasoned expert in C#/.NET programming and professionnal senior software architect, perform these tasks:
 
 2.1) - search into the ABYSS knowledge base all entities (modules, classes, methods) implied with the " Search", "Search pane UI and model", "Search result factory and filtering". Identify the relations between this entities.
 
@@ -33,10 +33,13 @@ As an seasoned expert in C#/.NET programming and professionnal senior software a
 Overall it is HIGHLY IMPORTANT to have a PROFESSIONAL LOOKING REPORT.
 
 
-
-<!-- 
-To Sonnet 4.6: Create a detailled plan with tasks for the implementation for document #file:analysis-prompt.original.md . reformulate the requirements document with EARS notation, to have a precise, non ambiguous implementation plan in order to get the BEST POSSIBLE RESULT with an agentic IA like you. Generated the result into file analysis-prompt.ai-augmented.md
--->
-
+---
+Prompt reformulation request before launching the execution: see [analysis-prompt.ai-augmented.md](https://github.com/spashx/abyss/blob/main/examples/ILSpy%20-%20search%20feature%20analysis/analysis-prompt.ai-augmented.md)
+```
+To Sonnet 4.6: Create a detailled plan with tasks for the implementation for document #file:analysis-prompt.original.md.
+Reformulate the requirements document with EARS notation, to have a precise, non ambiguous implementation plan in order to get the BEST POSSIBLE RESULT with an agentic IA like you. 
+Generated the result into file analysis-prompt.ai-augmented.md
+```
+---
 
 

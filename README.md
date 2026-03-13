@@ -312,6 +312,12 @@ Produces one self-contained HTML file per indexed source file, showing chunks, m
 
 ---
 
+
+## Example of usage
+
+see [Examples](https://github.com/spashx/abyss/tree/main/examples/) of what you can achieve with Abyss.
+
+
 ## Architecture
 
 ### Technology Stack
