@@ -91,10 +91,12 @@ $SCIP_JAVA_GROUP         = "com.sourcegraph"
 $SCIP_JAVA_MAVEN_BASE    = "https://repo1.maven.org/maven2/com/sourcegraph/${SCIP_JAVA_ARTIFACT}"
 $SCIP_JAVA_METADATA_URL  = "${SCIP_JAVA_MAVEN_BASE}/maven-metadata.xml"
 
-# Coursier Windows launcher — single .bat file, no installation required.
+# Coursier native Windows CLI — single exe, no companion JAR required.
 # Source: https://get-coursier.io/docs/cli-installation
-$SCIP_JAVA_COURSIER_URL  = "https://github.com/coursier/launchers/raw/refs/heads/master/coursier.bat"
-$SCIP_JAVA_COURSIER_NAME = "coursier.bat"
+# The ZIP from GitHub releases contains cs-x86_64-pc-win32.exe at the archive root.
+$SCIP_JAVA_COURSIER_URL  = "https://github.com/coursier/coursier/releases/latest/download/cs-x86_64-pc-win32.zip"
+$SCIP_JAVA_COURSIER_ZIP  = "cs-win32.zip"
+$SCIP_JAVA_COURSIER_EXE  = "cs-x86_64-pc-win32.exe"
 
 # JVM exports required by scip-java for Java 17+ (uses internal javac APIs).
 # Reference: https://sourcegraph.github.io/scip-java/docs/getting-started.html#java
@@ -120,7 +122,7 @@ $SECTION_VERIFY   = "Verifying Output"
 
 # -- scip-java runtime state (populated by Install-ToolViaCoursier) ----------
 
-$script:CoursierBatPath = $null
+$script:CoursierExePath = $null
 $script:ScipJavaVersion = $null
 
 # ==================================================================
@@ -151,8 +153,8 @@ $SCIP_INDEXERS = [ordered]@{
         RunFunction     = "Invoke-ScipPython"
     }
     "java" = @{
-        # Invoked via Coursier: coursier.bat launch <coord> -J<jvm-exports>... -- index
-        # Command = $null: no standalone CLI; presence check is coursier.bat in $ScriptDir
+        # Invoked via Coursier: cs.exe launch <coord> --java-opt <jvm-exports>... -- index
+        # Command = $null: no standalone CLI; Install-ToolViaCoursier downloads cs.exe
         Tool            = "scip-java"
         Command         = $null
         OutputFile      = "abyss.java.index.scip"
@@ -396,39 +398,60 @@ function Resolve-ScipJavaLatestVersion {
 function Install-ToolViaCoursier {
     <#
     .SYNOPSIS
-        Ensure the Coursier launcher (coursier.bat) is available and the latest
-        stable scip-java version is resolved.  Coursier is a single .bat file that
-        fetches and caches Maven dependencies at runtime -- no separate JAR management.
-        Reference: https://sourcegraph.github.io/scip-java/docs/getting-started.html#java-launcher
+        Ensure the Coursier native Windows CLI (cs-x86_64-pc-win32.exe) is available
+        and the latest stable scip-java version is resolved.
+        cs.exe is a self-contained executable -- no companion JAR or Java bootstrap required.
+        Reference: https://get-coursier.io/docs/cli-installation
     #>
 
-    # Download coursier.bat if not already cached next to this script
-    $coursierPath = Join-Path $ScriptDir $SCIP_JAVA_COURSIER_NAME
-    if (-not (Test-Path $coursierPath)) {
-        Write-Log "Downloading Coursier launcher ($SCIP_JAVA_COURSIER_NAME)..." $LOG_STEP
+    $csExePath = Join-Path $ScriptDir $SCIP_JAVA_COURSIER_EXE
+    if (-not (Test-Path $csExePath)) {
+        $csZipPath = Join-Path $ScriptDir $SCIP_JAVA_COURSIER_ZIP
+        Write-Log "Downloading Coursier CLI ($SCIP_JAVA_COURSIER_EXE)..." $LOG_STEP
         Write-Log "URL: $SCIP_JAVA_COURSIER_URL" $LOG_INFO
         try {
             $savedEAP              = $ErrorActionPreference
             $ErrorActionPreference = "Continue"
-            Invoke-WebRequest -Uri $SCIP_JAVA_COURSIER_URL -OutFile $coursierPath -UseBasicParsing -ErrorAction Stop
+            Invoke-WebRequest -Uri $SCIP_JAVA_COURSIER_URL -OutFile $csZipPath -UseBasicParsing -ErrorAction Stop
             $ErrorActionPreference = $savedEAP
         }
         catch {
             $ErrorActionPreference = $savedEAP
             Write-Log "Failed to download Coursier: $_" $LOG_ERROR
-            Write-Log "Download it manually from: https://get-coursier.io/docs/cli-installation" $LOG_WARN
+            Write-Log "Download manually from: https://get-coursier.io/docs/cli-installation" $LOG_WARN
             return $false
         }
-        if (-not (Test-Path $coursierPath)) {
-            Write-Log "$SCIP_JAVA_COURSIER_NAME not found after download: $coursierPath" $LOG_ERROR
+        if (-not (Test-Path $csZipPath)) {
+            Write-Log "$SCIP_JAVA_COURSIER_ZIP not found after download" $LOG_ERROR
             return $false
         }
-        Write-Log "Coursier launcher downloaded: $SCIP_JAVA_COURSIER_NAME" $LOG_SUCCESS
+        try {
+            Expand-Archive -Path $csZipPath -DestinationPath $ScriptDir -Force -ErrorAction Stop
+        }
+        catch {
+            Write-Log "Failed to extract $SCIP_JAVA_COURSIER_ZIP : $_" $LOG_ERROR
+            return $false
+        }
+        finally {
+            Remove-Item $csZipPath -Force -ErrorAction SilentlyContinue
+        }
+        # If the exe ended up in a subdirectory, move it up
+        if (-not (Test-Path $csExePath)) {
+            $found = Get-ChildItem -Path $ScriptDir -Filter $SCIP_JAVA_COURSIER_EXE -Recurse -Depth 2 | Select-Object -First 1
+            if ($found) {
+                Move-Item $found.FullName $csExePath -Force
+            }
+            else {
+                Write-Log "$SCIP_JAVA_COURSIER_EXE not found after extracting $SCIP_JAVA_COURSIER_ZIP" $LOG_ERROR
+                return $false
+            }
+        }
+        Write-Log "Coursier CLI downloaded: $SCIP_JAVA_COURSIER_EXE" $LOG_SUCCESS
     }
     else {
-        Write-Log "Coursier launcher found: $SCIP_JAVA_COURSIER_NAME" $LOG_SUCCESS
+        Write-Log "Coursier CLI found: $SCIP_JAVA_COURSIER_EXE" $LOG_SUCCESS
     }
-    $script:CoursierBatPath = $coursierPath
+    $script:CoursierExePath = $csExePath
 
     # Resolve the latest stable scip-java release version from Maven Central
     $version = Resolve-ScipJavaLatestVersion
@@ -569,19 +592,19 @@ function Invoke-ScipJava {
     }
     Write-Log "Build file found: $($buildFile.Name)" $LOG_INFO
 
-    # Coursier launch syntax:
-    #   coursier.bat launch <group:artifact:version> -J<jvm-flag>... -- <app-args>...
-    # The -J prefix passes each flag to the JVM; everything after -- goes to scip-java.
+    # Coursier  launch syntax:
+    #  cs launch <coord> --java-opt <flag>... -- <app-args>...
+    # cs requires one '--java-opt <value>' pair per JVM flag.
     # Java 17+ requires --add-exports for the internal javac APIs used by scip-java.
     $coord      = "${SCIP_JAVA_GROUP}:${SCIP_JAVA_ARTIFACT}:${script:ScipJavaVersion}"
-    $jvmFlags   = $SCIP_JAVA_JVM_EXPORTS | ForEach-Object { "-J$_" }
+    $jvmFlags   = $SCIP_JAVA_JVM_EXPORTS | ForEach-Object { @("--java-opt", $_) }
     $launchArgs = @("launch", $coord) + $jvmFlags + @("--", "index")
 
-    Write-Log "Running: coursier launch $coord -- index (cwd: $TargetDir)" $LOG_STEP
+    Write-Log "Running: $SCIP_JAVA_COURSIER_EXE launch $coord -- index (cwd: $TargetDir)" $LOG_STEP
     Push-Location $TargetDir
     try {
         $result = Invoke-ExternalCommand -Description "scip-java index" `
-            -Executable $script:CoursierBatPath -Arguments $launchArgs
+            -Executable $script:CoursierExePath -Arguments $launchArgs
     }
     finally { Pop-Location }
 
