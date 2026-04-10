@@ -107,30 +107,32 @@ scip_indexers:
 chroma_persist_dir: "data/chroma_db"
 
 # ───────────────────────────────────────────────────────────────────────────
-#  Embedding Model Configuration
+#  Ollama Embedding Configuration (RQ-OLL-002, RQ-OLL-003, DEC-OLL-002)
 # ───────────────────────────────────────────────────────────────────────────
 
-# Sentence-transformers model used for both indexing and querying.
+# Base URL of the local Ollama server.
+# Override if Ollama is running on a non-default host or port.
+ollama_base_url: "http://localhost:11434"
+
+# Ollama model used for both indexing and querying.
 # Must be the SAME model for both pipeline and query engine
 # so that index vectors and query vectors are in the same vector space.
-embedding_model_name: "sentence-transformers/all-MiniLM-L6-v2"
+# Run: ollama pull nomic-embed-text   before starting Abyss.
+ollama_embedding_model: "nomic-embed-text"
 
-# Local directory where the embedding model snapshot is cached.
-# EmbeddingService downloads the model here on first use and reloads from
-# this directory on subsequent starts (no outbound network call).
-# Relative paths are resolved from the project root.
-# Default: data/models
-embedding_cache_dir: "data/models"
+# ───────────────────────────────────────────────────────────────────────────
+#  Chunk Parameters (RQ-OLL-004, DEC-OLL-003)
+# ───────────────────────────────────────────────────────────────────────────
+
+# Number of characters per chunk. Keep consistent with the Ollama model
+# context window (nomic-embed-text: 8192 tokens ~ 32768 chars).
+chunk_size: 512
 
 # Chunk overlap as a fraction of chunk_size.
-# chunk_overlap = int(chunk_size * chunk_overlap_ratio)
-# Example: for all-MiniLM-L6-v2 (max_seq_length=256),
-# chunk_size=1024, chunk_overlap=204 (0.2 * 1024)
+# CHUNK_OVERLAP = round(chunk_size * chunk_overlap_ratio)
 chunk_overlap_ratio: 0.2
 
-# ───────────────────────────────────────────────────────────────────────────
-#  EmbedBuilder Debug Mode
-# ───────────────────────────────────────────────────────────────────────────
+
 
 # When enabled, EmbedBuilder exports one HTML debug file per source file.
 # Each file is named after the source file: e.g. "toto.cs.html"

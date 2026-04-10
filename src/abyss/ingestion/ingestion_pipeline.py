@@ -11,7 +11,7 @@ from typing import Any
 
 from llama_index.core.schema import TextNode
 
-from ..config import EXCLUDE_EXTENSIONS
+from ..config import CHUNK_OVERLAP, CHUNK_SIZE, EXCLUDE_EXTENSIONS
 from ..services.embedding_service import EmbeddingService
 from ..storage.chroma_store import ChromaStore
 from ..storage.document_registry import DocumentRegistry
@@ -75,32 +75,6 @@ def _log_ingestion_summary(
             log.info("  %-10s: %d file%s", parser_type, count, "s" if count != 1 else "")
 
 
-def _infer_chunk_params() -> tuple[int, int]:
-    """
-    Derive (chunk_size, chunk_overlap) from the embedding model's max_seq_length.
-
-    chunk_size    = max_seq_length × 4  (≈ 4 chars per token)
-    chunk_overlap = chunk_size // 5     (20 % overlap)
-
-    Reads max_seq_length from the model's JSON config on disk via
-    EmbeddingService — no additional model load required.
-    Falls back to (1_000, 200) if the config cannot be read.
-    """
-    try:
-        max_tokens: int = EmbeddingService.get_instance().get_max_seq_length()
-        chunk_size = max_tokens * 4
-        logger.info(
-            "Chunk params: max_seq_length=%d => chunk_size=%d, chunk_overlap=%d",
-            max_tokens, chunk_size, chunk_size // 5,
-        )
-        return chunk_size, chunk_size // 5
-    except Exception as exc:
-        logger.warning(
-            "Could not infer chunk size from model (%s) — using defaults (1000, 200)", exc
-        )
-        return 1_000, 200
-
-
 class IngestionPipeline:
     """
     Orchestrate the complete ingestion pipeline:
@@ -108,7 +82,7 @@ class IngestionPipeline:
     2. Parsing by type   (CodeParser / JsonParser / XmlParser / DocumentParser)
     3. SCIP enrichment   (ScipEnricher — optional)
     4. Embed text build  (EmbedBuilder — semantic header)
-    5. Embedding         (HuggingFaceEmbedding)
+    5. Embedding         (OllamaEmbedding via Ollama server)
     6. Storage           (ChromaStore)
     7. Registration      (DocumentRegistry)
     """
@@ -132,7 +106,12 @@ class IngestionPipeline:
 
     @cached_property
     def _chunk_params(self) -> tuple[int, int]:
-        return _infer_chunk_params()
+        # RQ-OLL-004, DEC-OLL-003 -- chunk size read from config, not inferred from model
+        logger.info(
+            "Chunk params from config: chunk_size=%d, chunk_overlap=%d",
+            CHUNK_SIZE, CHUNK_OVERLAP,
+        )
+        return CHUNK_SIZE, CHUNK_OVERLAP
 
     @cached_property
     def _discovery(self) -> FileDiscovery:
