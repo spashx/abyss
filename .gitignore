@@ -215,3 +215,7 @@ __marimo__/
 # Chromadb sqlite files
 .sqlite3
 data/chroma_db/chroma.sqlite3
+
+
+# abyss data files
+data/
