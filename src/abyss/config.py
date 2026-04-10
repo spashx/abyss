@@ -110,6 +110,10 @@ _DEFAULT_OLLAMA_EMBEDDING_MODEL: str = "nomic-embed-text"
 _DEFAULT_CHUNK_SIZE: int = 512
 _DEFAULT_CHUNK_OVERLAP_RATIO: float = 0.2
 
+# Batch ingestion parameters (RQ-BIN-004, DEC-BIN-004)
+_DEFAULT_INGEST_BATCH_SIZE: int = 100
+_DEFAULT_INGEST_LARGE_DIR_THRESHOLD: int = 10_000
+
 # EmbedBuilder configuration
 _DEFAULT_EMBED_BUILDER_DEBUG: bool = False
 _DEFAULT_EMBED_BUILDER_OUTPUT_DIR: str = "logs/EmbedBuilder"
@@ -251,6 +255,16 @@ CHUNK_OVERLAP_RATIO: float = _get_config_value(
 # Derived chunk overlap in characters
 CHUNK_OVERLAP: int = round(CHUNK_SIZE * CHUNK_OVERLAP_RATIO)
 
+# Batch ingestion: number of files processed per batch (RQ-BIN-004, DEC-BIN-004)
+INGEST_BATCH_SIZE: int = _get_config_value(
+    _config, "ingest_batch_size", _DEFAULT_INGEST_BATCH_SIZE
+)
+
+# Batch ingestion: file count above which explicit confirmation is required (RQ-BIN-004, DEC-BIN-004)
+INGEST_LARGE_DIR_THRESHOLD: int = _get_config_value(
+    _config, "ingest_large_dir_threshold", _DEFAULT_INGEST_LARGE_DIR_THRESHOLD
+)
+
 # EmbedBuilder configuration
 EMBED_BUILDER_DEBUG: bool = _get_config_value(
     _config, "embed_builder_debug", _DEFAULT_EMBED_BUILDER_DEBUG
@@ -292,6 +306,7 @@ _CONFIG_KEYS = [
     "chroma_persist_dir",
     "ollama_base_url", "ollama_embedding_model",
     "chunk_size", "chunk_overlap_ratio",
+    "ingest_batch_size", "ingest_large_dir_threshold",
     "embed_builder_debug", "embed_builder_debug_output_dir",
 ]
 _n_from_file = sum(1 for k in _CONFIG_KEYS if k in _config)
