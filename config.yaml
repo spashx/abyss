@@ -134,7 +134,19 @@ chunk_size: 1024
 # CHUNK_OVERLAP = round(chunk_size * chunk_overlap_ratio)
 chunk_overlap_ratio: 0.2
 
+# ───────────────────────────────────────────────────────────────────────────
+#  Batch Ingestion Parameters (RQ-BIN-004, DEC-BIN-004)
+# ───────────────────────────────────────────────────────────────────────────
 
+# Number of files processed per ingestion batch.
+# Tune this to match available RAM and Ollama throughput.
+# Lower values reduce peak memory usage; higher values improve throughput.
+ingest_batch_size: 100
+
+# Number of files above which index_directory requires explicit confirmation
+# before proceeding (two-call protocol, mirroring clear_database).
+# Set to 0 to disable the gate entirely.
+ingest_large_dir_threshold: 10000
 
 # When enabled, EmbedBuilder exports one HTML debug file per source file.
 # Each file is named after the source file: e.g. "toto.cs.html"
