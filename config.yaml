@@ -117,16 +117,18 @@ ollama_base_url: "http://localhost:11434"
 # Ollama model used for both indexing and querying.
 # Must be the SAME model for both pipeline and query engine
 # so that index vectors and query vectors are in the same vector space.
-# Run: ollama pull nomic-embed-text   before starting Abyss.
-ollama_embedding_model: "nomic-embed-text"
+# Run: ollama pull <model> before starting the server to ensure the model is available locally.
+# https://blog.stackademic.com/sentence-transformers-in-2026-a-no-nonsense-guide-for-real-business-impact-0bd5d48d1796
+
+ollama_embedding_model: "all-minilm:l6-v2"
 
 # ───────────────────────────────────────────────────────────────────────────
 #  Chunk Parameters (RQ-OLL-004, DEC-OLL-003)
 # ───────────────────────────────────────────────────────────────────────────
 
 # Number of characters per chunk. Keep consistent with the Ollama model
-# context window (nomic-embed-text: 8192 tokens ~ 32768 chars).
-chunk_size: 512
+# context window (all-minilm:l6-v2: max ~512 tokens, assuming ~1 token per 4–5 characters with safe margin=>1024).
+chunk_size: 1024
 
 # Chunk overlap as a fraction of chunk_size.
 # CHUNK_OVERLAP = round(chunk_size * chunk_overlap_ratio)

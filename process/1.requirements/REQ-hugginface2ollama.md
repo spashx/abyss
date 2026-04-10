@@ -1,6 +1,6 @@
 # context and objective
 
-This application is a RAG MCP server based on python. It enable the end user to ingest almost any files from a directory into the chroma vector database, then use the MCP server interface to make queries on the ingested data.
+This application is a RAG MCP server, called Abyss. It enables the end user to ingest almost any files from a directory into the chroma vector database, then use the MCP server interface to make queries on the ingested data.
 
 It uses HuggingFaceEmbedding sentence transformers for embeddings - see embedding_service.py
 The embeeding model is defined in the configuration file - see config.py. 
@@ -17,5 +17,10 @@ The application SHALL use Ollama as model provider for embeddings instead of Hug
 Regarding the infer_chunk_params, since Ollama server does not provide the embedding model properties like HuggingFace, the calculation for chunks that currently exist in the source code shall be configuration in configuration parameters into config.py/config.yaml
 
 The code shall be adapted accordingly. The comments shall be adapted as well.
+
+## Usage of the Abyss MCP server that contains the Abyss source code itself
+The source code of Abyss itself is currently already ingested and indexed in the Abyss MCP server currently running in this very running VScode session.
+MANDATORY: when searching about source code to get a global situation awareness of the application or details about the code, ALWAYS QUERY the Abyss MCP server in PRIORITY. This will SAVE YOU TIME and will limit Copilot premium queries consumptions.
+
 
 
