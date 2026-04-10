@@ -34,9 +34,12 @@ _STAT_XML      = "xml"
 _EXT_JSON      = ".json"
 
 # ── Embedding store batch size (RQ-BIN-001, DEC-BIN-001) ──────────────────────
-# Controls how many nodes are sent to ChromaDB per HTTP call inside _embed_and_store.
+# Controls how many nodes are sent per Ollama /api/embed call inside _embed_and_store.
 # Distinct from INGEST_BATCH_SIZE (which governs file-level batching).
-_EMBED_STORE_BATCH_SIZE: int = 50
+# Set to 1: Ollama checks total token count across all inputs in a batch against the
+# model context window. For small-context models (e.g. all-minilm:l6-v2, 512 tokens)
+# sending more than one chunk per call causes a 400 context-length error.
+_EMBED_STORE_BATCH_SIZE: int = 1
 
 # Ordered tuple used to initialize and iterate parser counters consistently
 _PARSER_COUNTER_KEYS: tuple[str, ...] = (
