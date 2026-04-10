@@ -18,7 +18,7 @@ from ..storage.document_registry import DocumentRegistry
 from .embed_builder import EmbedBuilder
 from .file_discovery import FileDiscovery, FileType
 from .scip_enricher import ScipEnricher
-from .parsers.code_parser import CodeParser
+from .parsers.code_parser import CodeParser, DEFAULT_CHUNK_LINES, DEFAULT_CHUNK_LINES_OVERLAP
 from .parsers.doc_parser import DocumentParser
 from .parsers.json_parser import JsonParser
 from .parsers.xml_parser import XmlParser
@@ -124,7 +124,15 @@ class IngestionPipeline:
 
     @cached_property
     def _code_parser(self) -> CodeParser:
-        return CodeParser(*self._chunk_params)
+        # max_chars is driven by CHUNK_SIZE (characters) to bound individual chunk size
+        # for the embedding model. chunk_lines / chunk_overlap use the same config values
+        # as line-count approximations -- they are secondary to max_chars for the model.
+        chunk_size, _ = self._chunk_params
+        return CodeParser(
+            chunk_lines=DEFAULT_CHUNK_LINES,
+            chunk_overlap=DEFAULT_CHUNK_LINES_OVERLAP,
+            max_chars=chunk_size,
+        )
 
     @cached_property
     def _json_parser(self) -> JsonParser:

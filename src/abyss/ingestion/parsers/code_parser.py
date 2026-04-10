@@ -15,8 +15,8 @@ logger = logging.getLogger(__name__)
 
 # Default parameters of CodeSplitter
 DEFAULT_CHUNK_LINES = 60
-DEFAULT_CHUNK_OVERLAP = 10
-DEFAULT_MAX_CHARS = 2000
+DEFAULT_CHUNK_LINES_OVERLAP = 10
+DEFAULT_MAX_CHARS = 1000
 
 
 class CodeParser(BaseParser):
@@ -34,7 +34,7 @@ class CodeParser(BaseParser):
     def __init__(
         self,
         chunk_lines: int = DEFAULT_CHUNK_LINES,
-        chunk_overlap: int = DEFAULT_CHUNK_OVERLAP,
+        chunk_overlap: int = DEFAULT_CHUNK_LINES_OVERLAP,
         max_chars: int = DEFAULT_MAX_CHARS,
     ) -> None:
         self._chunk_lines = chunk_lines
