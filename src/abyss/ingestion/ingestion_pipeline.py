@@ -11,7 +11,7 @@ from typing import Any
 
 from llama_index.core.schema import TextNode
 
-from ..config import CHUNK_OVERLAP, CHUNK_SIZE, EXCLUDE_EXTENSIONS
+from ..config import CHUNK_OVERLAP, CHUNK_SIZE, EXCLUDE_EXTENSIONS, INGEST_BATCH_SIZE
 from ..services.embedding_service import EmbeddingService
 from ..storage.chroma_store import ChromaStore
 from ..storage.document_registry import DocumentRegistry
@@ -32,6 +32,11 @@ _STAT_UNKNOWN  = FileType.UNKNOWN.value   # "unknown"
 _STAT_JSON     = "json"
 _STAT_XML      = "xml"
 _EXT_JSON      = ".json"
+
+# ── Embedding store batch size (RQ-BIN-001, DEC-BIN-001) ──────────────────────
+# Controls how many nodes are sent to ChromaDB per HTTP call inside _embed_and_store.
+# Distinct from INGEST_BATCH_SIZE (which governs file-level batching).
+_EMBED_STORE_BATCH_SIZE: int = 50
 
 # Ordered tuple used to initialize and iterate parser counters consistently
 _PARSER_COUNTER_KEYS: tuple[str, ...] = (
@@ -145,91 +150,149 @@ class IngestionPipeline:
         extensions: set[str] | None = None,
         exclude_dirs: list[str] | None = None,
         exclude_extensions: set[str] | None = None,
+        batch_size: int | None = None,
     ) -> dict:
         """
-        Main entry point — index every supported file in a directory tree.
+        Main entry point -- index every supported file in a directory tree.
+
+        Files are processed in sequential batches of `batch_size` (default:
+        INGEST_BATCH_SIZE from config). If a batch raises an unhandled exception,
+        processing stops immediately and the response status is set to "partial".
+        (RQ-BIN-001, RQ-BIN-005, RQ-BIN-006, DEC-BIN-001, DEC-BIN-003)
 
         Args:
             directory:          Root directory to scan.
             extensions:         Extensions to include (default: all supported).
             exclude_dirs:       Directory names to skip (default: DEFAULT_EXCLUDE_DIRS).
             exclude_extensions: Extensions to exclude explicitly (default: EXCLUDE_EXTENSIONS).
+            batch_size:         Override INGEST_BATCH_SIZE for this call (tests / callers).
 
         Returns:
             {
-                "status": "ok",
+                "status": "ok" | "partial",
                 "files_processed": int,
                 "chunks_created": int,
                 "scip_enriched": int,
                 "errors": list[str],
+                "batches": list[dict],
+                "batches_completed": int,
+                "batches_failed": int,
+                "ingestion_stats": dict,
             }
         """
+        # RQ-BIN-001, DEC-BIN-001
+        effective_batch_size = batch_size if batch_size is not None else INGEST_BATCH_SIZE
         directory_path = Path(directory).resolve()
         start_time = time.perf_counter()
 
-        # Stats counters — keys driven by _PARSER_COUNTER_KEYS (no literals here)
+        # Aggregate stats
         by_parser: dict[str, int] = dict.fromkeys(_PARSER_COUNTER_KEYS, 0)
         by_language: dict[str, int] = defaultdict(int)
 
-        # 1. Discover files
+        # 1. Discover all matching files upfront (fast walk, no parsing)
         discovery = FileDiscovery(
             extensions=extensions,
             exclude_dirs=exclude_dirs,
             exclude_extensions=exclude_extensions if exclude_extensions is not None else EXCLUDE_EXTENSIONS,
         )
-        files = discovery.discover(directory_path)
+        files = list(discovery.discover(directory_path))
 
-        # 2. SCIP enricher (loads index once for the whole directory)
+        # 2. SCIP enricher — loaded once for the whole directory
         scip_enricher = ScipEnricher(directory_path)
 
-        # 3. Parse each file
-        all_nodes: list[TextNode] = []
-        file_nodes_map: dict[str, list[TextNode]] = {}
-        errors: list[str] = []
+        # 3. Process files in batches (RQ-BIN-001, DEC-BIN-001)
+        batches_results: list[dict] = []
+        batches_completed = 0
+        batches_failed = 0
+        total_chunks = 0
+        total_scip = 0
+        all_errors: list[str] = []
+        status = "ok"
 
-        for file_path in files:
+        for batch_index, batch_start in enumerate(range(0, len(files), effective_batch_size)):
+            batch_files = files[batch_start : batch_start + effective_batch_size]
+            batch_nodes: list[TextNode] = []
+            batch_file_nodes: dict[str, list[TextNode]] = {}
+            batch_errors: list[str] = []
+
             try:
-                if self._registry.exists(str(file_path)):
-                    self._store.delete_by_file(str(file_path))
-                nodes = self._parse_file(file_path)
-                all_nodes.extend(nodes)
-                file_nodes_map[str(file_path)] = nodes
+                # Parse each file in the batch
+                for file_path in batch_files:
+                    try:
+                        if self._registry.exists(str(file_path)):
+                            self._store.delete_by_file(str(file_path))
+                        nodes = self._parse_file(file_path)
+                        batch_nodes.extend(nodes)
+                        batch_file_nodes[str(file_path)] = nodes
 
-                # Track parser type for statistics
-                label = self._parser_label(file_path)
-                by_parser[label] += 1
-                if label == _STAT_CODE:
-                    lang = self._discovery.get_language(file_path) or file_path.suffix.lower().lstrip(".")
-                    by_language[lang] += 1
+                        label = self._parser_label(file_path)
+                        by_parser[label] += 1
+                        if label == _STAT_CODE:
+                            lang = self._discovery.get_language(file_path) or file_path.suffix.lower().lstrip(".")
+                            by_language[lang] += 1
+                    except Exception as e:
+                        msg = f"Error on {file_path}: {e}"
+                        logger.error(msg)
+                        batch_errors.append(msg)
+
+                # SCIP enrichment for this batch
+                batch_scip = scip_enricher.enrich(batch_nodes) if scip_enricher.available else 0
+
+                # Build embedded text
+                self._embed_builder.apply(batch_nodes)
+
+                # Embed + store
+                await self._embed_and_store(batch_nodes)
+
+                # Register files in this batch
+                for file_path_str, nodes in batch_file_nodes.items():
+                    fp = Path(file_path_str)
+                    try:
+                        size = fp.stat().st_size
+                    except OSError:
+                        size = 0
+                    self._registry.register(
+                        file_path=file_path_str,
+                        chunk_count=len(nodes),
+                        file_size=size,
+                    )
+
+                total_chunks += len(batch_nodes)
+                total_scip += batch_scip
+                all_errors.extend(batch_errors)
+                batches_completed += 1
+
+                batch_result = {
+                    "batch_index": batch_index,
+                    "files_processed": len(batch_file_nodes),
+                    "chunks_created": len(batch_nodes),
+                    "errors": batch_errors,
+                }
+                batches_results.append(batch_result)
+                logger.info(
+                    "Batch %d/%d complete: %d files, %d chunks",
+                    batch_index + 1,
+                    -(-len(files) // effective_batch_size),  # ceiling division
+                    len(batch_file_nodes),
+                    len(batch_nodes),
+                )
+
             except Exception as e:
-                msg = f"Error on {file_path}: {e}"
+                # RQ-BIN-006, DEC-BIN-003 -- stop immediately on unhandled batch failure
+                msg = f"Batch {batch_index} failed: {e}"
                 logger.error(msg)
-                errors.append(msg)
-
-        # 4. SCIP enrichment
-        scip_count = scip_enricher.enrich(all_nodes) if scip_enricher.available else 0
-
-        # 5. Build embedded text (semantic header + content)
-        self._embed_builder.apply(all_nodes)
-
-        # 6. Embedding + storage
-        await self._embed_and_store(all_nodes)
-
-        # 7. Register each file in the registry
-        for file_path_str, nodes in file_nodes_map.items():
-            fp = Path(file_path_str)
-            try:
-                size = fp.stat().st_size
-            except OSError:
-                size = 0
-            self._registry.register(
-                file_path=file_path_str,
-                chunk_count=len(nodes),
-                file_size=size,
-            )
+                batches_failed += 1
+                batches_results.append({
+                    "batch_index": batch_index,
+                    "files_processed": 0,
+                    "chunks_created": 0,
+                    "error": msg,
+                })
+                status = "partial"
+                break
 
         elapsed = time.perf_counter() - start_time
-        total_files = len(file_nodes_map)
+        total_files = sum(b.get("files_processed", 0) for b in batches_results)
         files_per_sec = round(total_files / elapsed, 2) if elapsed > 0 else 0.0
 
         ingestion_stats = {
@@ -244,11 +307,14 @@ class IngestionPipeline:
         )
 
         result = {
-            "status": "ok",
+            "status": status,
             "files_processed": total_files,
-            "chunks_created": len(all_nodes),
-            "scip_enriched": scip_count,
-            "errors": errors,
+            "chunks_created": total_chunks,
+            "scip_enriched": total_scip,
+            "errors": all_errors,
+            "batches": batches_results,
+            "batches_completed": batches_completed,
+            "batches_failed": batches_failed,
             "ingestion_stats": ingestion_stats,
         }
         logger.info("Ingestion completed: %s", result)
@@ -347,10 +413,8 @@ class IngestionPipeline:
         if not nodes:
             return
 
-        BATCH_SIZE = 50
-
-        for i in range(0, len(nodes), BATCH_SIZE):
-            batch = nodes[i : i + BATCH_SIZE]
+        for i in range(0, len(nodes), _EMBED_STORE_BATCH_SIZE):
+            batch = nodes[i : i + _EMBED_STORE_BATCH_SIZE]
             texts = [node.text for node in batch]
             embeddings = await self._embed_model.aget_text_embedding_batch(texts)
             ids = [self._make_chunk_id(node) for node in batch]
