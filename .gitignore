@@ -219,3 +219,10 @@ data/chroma_db/chroma.sqlite3
 
 # abyss data files
 data/
+
+
+# binaries files
+*.exe
+*.dll
+*.so
+*.dylib
