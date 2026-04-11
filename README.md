@@ -27,7 +27,7 @@ Abyss is a local **Retrieval-Augmented Generation (RAG)** server that indexes yo
 ## Key Features
 
 - **100% offline** -- no cloud API, no telemetry, no data leaves your machine
-- **No GPU required** -- runs on CPU with a quantized sentence-transformers model
+- **No GPU required** -- embeddings are delegated to a local Ollama server (CPU-friendly models available)
 - **MCP-native** -- integrates into VS Code, Claude Desktop, and any MCP-compatible client
 - **Semantic search** -- vector similarity search over code and documentation
 - **Multi-language code parsing** -- syntax-aware AST chunking via Tree-sitter (C#, Python, Java, TypeScript, JavaScript, HTML)
@@ -46,6 +46,7 @@ Abyss is a local **Retrieval-Augmented Generation (RAG)** server that indexes yo
 
 - **Python 3.13**
 - **[uv](https://github.com/astral-sh/uv)** -- fast Python package manager
+- **[Ollama](https://ollama.com/)** -- local model server (must be running before starting Abyss)
 
 Install `uv` if needed:
 
@@ -80,7 +81,15 @@ source .venv/bin/activate
 uv pip install -r requirements.txt
 ```
 
-The setup script creates a `.venv/`, installs dependencies, and prints the MCP configuration block. On first run, Abyss downloads the embedding model (~90MB) into `data/models/`. Subsequent starts are fully offline.
+The setup script creates a `.venv/`, installs dependencies, and prints the MCP configuration block.
+
+Before starting Abyss, pull the embedding model into Ollama:
+
+```bash
+ollama pull all-minilm:l6-v2
+```
+
+Ollama must be running when Abyss starts. All embedding calls are made locally over HTTP -- no data leaves your machine.
 
 ### Connect to VS Code
 
@@ -270,15 +279,23 @@ exclude_dirs:
 chroma_persist_dir: "data/chroma_db"
 ```
 
-### Embedding Model
+### Ollama Embedding
 
 ```yaml
-embedding_model_name: "sentence-transformers/all-MiniLM-L6-v2"
-embedding_cache_dir: "data/models"
+# URL of the local Ollama server
+ollama_base_url: "http://localhost:11434"
+
+# Model used for both indexing and querying -- must be the same for both
+ollama_embedding_model: "all-minilm:l6-v2"
+
+# Characters per chunk -- keep consistent with the model context window
+chunk_size: 256
+
+# Overlap as a fraction of chunk_size
 chunk_overlap_ratio: 0.2
 ```
 
-> Changing `embedding_model_name` invalidates the existing database -- clear and re-index.
+> The same model **must** be used for indexing and querying -- mixing models corrupts the vector space. Run `ollama pull <model>` before switching, then clear and re-index.
 
 ### SCIP Indexers
 
@@ -329,7 +346,7 @@ see [Examples](https://github.com/spashx/abyss/tree/main/examples/) of what you 
 | **Code parsing** | [Tree-sitter](https://tree-sitter.github.io/) + `tree-sitter-language-pack` |
 | **SCIP indexing** | [SCIP protocol](https://scip-code.org/) (optional) |
 | **Document conversion** | [MarkItDown](https://github.com/microsoft/markitdown) (Microsoft) |
-| **Embeddings** | [sentence-transformers/all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) |
+| **Embeddings** | [Ollama](https://ollama.com/) (`all-minilm:l6-v2` default, configurable) |
 | **Vector database** | [ChromaDB](https://www.trychroma.com/) (embedded SQLite) |
 | **Runtime** | Python 3.13, managed with [uv](https://github.com/astral-sh/uv) |
 
