@@ -107,30 +107,46 @@ scip_indexers:
 chroma_persist_dir: "data/chroma_db"
 
 # ───────────────────────────────────────────────────────────────────────────
-#  Embedding Model Configuration
+#  Ollama Embedding Configuration (RQ-OLL-002, RQ-OLL-003, DEC-OLL-002)
 # ───────────────────────────────────────────────────────────────────────────
 
-# Sentence-transformers model used for both indexing and querying.
+# Base URL of the local Ollama server.
+# Override if Ollama is running on a non-default host or port.
+ollama_base_url: "http://localhost:11434"
+
+# Ollama model used for both indexing and querying.
 # Must be the SAME model for both pipeline and query engine
 # so that index vectors and query vectors are in the same vector space.
-embedding_model_name: "sentence-transformers/all-MiniLM-L6-v2"
+# Run: ollama pull <model> before starting the server to ensure the model is available locally.
+# https://blog.stackademic.com/sentence-transformers-in-2026-a-no-nonsense-guide-for-real-business-impact-0bd5d48d1796
 
-# Local directory where the embedding model snapshot is cached.
-# EmbeddingService downloads the model here on first use and reloads from
-# this directory on subsequent starts (no outbound network call).
-# Relative paths are resolved from the project root.
-# Default: data/models
-embedding_cache_dir: "data/models"
+ollama_embedding_model: "all-minilm:l6-v2"
+
+# ───────────────────────────────────────────────────────────────────────────
+#  Chunk Parameters (RQ-OLL-004, DEC-OLL-003)
+# ───────────────────────────────────────────────────────────────────────────
+
+# Number of characters per chunk. Keep consistent with the Ollama model
+# context window (all-minilm:l6-v2).
+chunk_size: 256
 
 # Chunk overlap as a fraction of chunk_size.
-# chunk_overlap = int(chunk_size * chunk_overlap_ratio)
-# Example: for all-MiniLM-L6-v2 (max_seq_length=256),
-# chunk_size=1024, chunk_overlap=204 (0.2 * 1024)
+# CHUNK_OVERLAP = round(chunk_size * chunk_overlap_ratio)
 chunk_overlap_ratio: 0.2
 
 # ───────────────────────────────────────────────────────────────────────────
-#  EmbedBuilder Debug Mode
+#  Batch Ingestion Parameters (RQ-BIN-004, DEC-BIN-004)
 # ───────────────────────────────────────────────────────────────────────────
+
+# Number of files processed per ingestion batch.
+# Tune this to match available RAM and Ollama throughput.
+# Lower values reduce peak memory usage; higher values improve throughput.
+ingest_batch_size: 100
+
+# Number of files above which index_directory requires explicit confirmation
+# before proceeding (two-call protocol, mirroring clear_database).
+# Set to 0 to disable the gate entirely.
+ingest_large_dir_threshold: 10000
 
 # When enabled, EmbedBuilder exports one HTML debug file per source file.
 # Each file is named after the source file: e.g. "toto.cs.html"

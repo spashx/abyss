@@ -21,9 +21,10 @@ llama-index-core>=0.11
 # File readers: extracts text from PDF, DOCX, PPTX, EPUB, CSV, images, and JSON documents
 llama-index-readers-file
 
-# Hugging Face embeddings: integrates local sentence-transformers models (e.g., all-MiniLM-L6-v2)
-# Enables offline semantic search without external API calls
-llama-index-embeddings-huggingface
+# Ollama embeddings: delegates embedding generation to a local Ollama server via HTTP
+# Eliminates in-process model loading; requires Ollama running at OLLAMA_BASE_URL
+# RQ-OLL-001, DEC-OLL-001
+llama-index-embeddings-ollama
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Vector Database & Storage
@@ -54,9 +55,9 @@ grpcio-tools
 # Embeddings & Semantic Search
 # ═══════════════════════════════════════════════════════════════════════════
 
-# Sentence-transformers: local pre-trained models for semantic embeddings (e.g., all-MiniLM-L6-v2)
-# Used indirectly via llama-index-embeddings-huggingface; provides 384-dimensional vectors
-sentence-transformers
+# httpx: HTTP client used by OllamaEmbedding to communicate with the Ollama server
+# RQ-OLL-001, DEC-OLL-001
+httpx>=0.27
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Document Format Support

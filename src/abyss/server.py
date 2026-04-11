@@ -17,6 +17,7 @@ from .config import (
     CODE_EXTENSIONS,
     DEFAULT_EXCLUDE_DIRS,
     DOCUMENT_EXTENSIONS,
+    INGEST_LARGE_DIR_THRESHOLD,
     SCIP_INDEXERS,
     STRUCTURED_EXTENSIONS,
 )
@@ -48,10 +49,11 @@ _RES_SUPPORTED_EXTENSIONS = "rag://supported-extensions"
 _RES_STATS                = "rag://stats"
 
 # ── Result status values ──────────────────────────────────────────
-_STATUS_OK       = "ok"
-_STATUS_ERROR    = "error"
-_STATUS_WARNING  = "warning"
-_STATUS_REJECTED = "rejected"
+_STATUS_OK                   = "ok"
+_STATUS_ERROR                = "error"
+_STATUS_WARNING              = "warning"
+_STATUS_REJECTED             = "rejected"
+_STATUS_REQUIRES_CONFIRM     = "requires_confirmation"
 
 # ── Filter parameter names ────────────────────────────────────────
 _FILT_SOURCES            = "sources"
@@ -148,6 +150,17 @@ def create_server() -> Server:
                             "items": {"type": "string"},
                             "description": "Extensions to exclude",
                             "default": [],
+                        },
+                        "confirm_large": {
+                            "type": "boolean",
+                            "description": (
+                                "Set to true to proceed when the file count exceeds "
+                                "the large-directory threshold. On first call without "
+                                "this flag, the tool returns requires_confirmation "
+                                "with the file count so the caller can relay the "
+                                "information to the user before re-invoking."
+                            ),
+                            "default": False,
                         },
                     },
                     "required": ["path"],
@@ -770,3 +783,37 @@ def _compute_stats(store: ChromaStore, registry: DocumentRegistry) -> dict:
         "by_kind": dict(sorted(by_kind.items(), key=lambda x: -x[1])),
         "by_doc_type": dict(sorted(by_doc_type.items(), key=lambda x: -x[1])),
     }
+
+
+def _count_matching_files(
+    directory: str,
+    extensions: set[str],
+    exclude_dirs: list[str],
+) -> int:
+    """
+    Fast directory walk that counts files matching the given extensions.
+
+    No parsing, no embedding — pure filesystem traversal.
+    Used by the large-directory pre-check gate (RQ-BIN-002, DEC-BIN-002).
+
+    Args:
+        directory:    Root directory to scan.
+        extensions:   Set of extensions to count (e.g. {".cs", ".py"}).
+        exclude_dirs: Directory names to skip during traversal.
+
+    Returns:
+        Count of matching files.
+    """
+    root = Path(directory)
+    if not root.is_dir():
+        return 0
+
+    exclude_set = set(exclude_dirs)
+    count = 0
+    for dirpath, dirnames, filenames in os.walk(root):
+        # Prune excluded dirs in-place so os.walk skips them
+        dirnames[:] = [d for d in dirnames if d not in exclude_set]
+        for filename in filenames:
+            if Path(filename).suffix.lower() in extensions:
+                count += 1
+    return count
