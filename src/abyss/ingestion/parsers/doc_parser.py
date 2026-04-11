@@ -385,6 +385,11 @@ class DocumentParser(BaseParser):
     ) -> list[TextNode]:
         """
         Split an oversized section by paragraphs with 1-paragraph overlap.
+
+        When a single paragraph is itself larger than chunk_size (e.g. a
+        fenced code block with no internal blank lines), it is force-split
+        on newline boundaries so that every resulting chunk respects the
+        configured limit.
         """
         paragraphs = re.split(r"\n\s*\n", section[_K_CONTENT])
         nodes: list[TextNode] = []
@@ -411,12 +416,49 @@ class DocumentParser(BaseParser):
             }
             return TextNode(id_=str(uuid.uuid4()), text=chunk_text, metadata=meta)
 
+        def _force_split_paragraph(para: str) -> list[str]:
+            """Split an oversized paragraph on newline boundaries."""
+            lines = para.split("\n")
+            chunks: list[str] = []
+            current_lines: list[str] = []
+            current_len = 0
+            for line in lines:
+                line_len = len(line) + 1  # +1 for the newline separator
+                if current_len + line_len > self.chunk_size and current_lines:
+                    chunks.append("\n".join(current_lines))
+                    current_lines = [line]
+                    current_len = len(line)
+                else:
+                    current_lines.append(line)
+                    current_len += line_len
+            if current_lines:
+                chunks.append("\n".join(current_lines))
+            return chunks
+
         for para in paragraphs:
             para_size = len(para)
+
+            # If a single paragraph exceeds chunk_size, force-split it on
+            # newline boundaries (handles e.g. fenced code blocks with no
+            # internal blank lines).
+            if para_size > self.chunk_size:
+                # Flush any accumulated paragraphs first.
+                if current_paras:
+                    nodes.append(_flush(current_paras))
+                    current_paras, current_size = [], 0
+                sub_chunks = _force_split_paragraph(para)
+                for sub in sub_chunks:
+                    nodes.append(_flush([sub]))
+                continue
+
             if current_size + para_size > self.chunk_size and current_paras:
                 nodes.append(_flush(current_paras))
-                # 1-paragraph overlap
-                current_paras = [current_paras[-1], para]
+                # 1-paragraph overlap -- only when the overlap itself fits within chunk_size.
+                overlap_para = current_paras[-1]
+                if len(overlap_para) + para_size <= self.chunk_size:
+                    current_paras = [overlap_para, para]
+                else:
+                    current_paras = [para]
                 current_size = sum(len(p) for p in current_paras)
             else:
                 current_paras.append(para)

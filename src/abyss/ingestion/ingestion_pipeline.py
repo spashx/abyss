@@ -36,10 +36,7 @@ _EXT_JSON      = ".json"
 # ── Embedding store batch size (RQ-BIN-001, DEC-BIN-001) ──────────────────────
 # Controls how many nodes are sent per Ollama /api/embed call inside _embed_and_store.
 # Distinct from INGEST_BATCH_SIZE (which governs file-level batching).
-# Set to 1: Ollama checks total token count across all inputs in a batch against the
-# model context window. For small-context models (e.g. all-minilm:l6-v2, 512 tokens)
-# sending more than one chunk per call causes a 400 context-length error.
-_EMBED_STORE_BATCH_SIZE: int = 1
+_EMBED_STORE_BATCH_SIZE: int = 50
 
 # Ordered tuple used to initialize and iterate parser counters consistently
 _PARSER_COUNTER_KEYS: tuple[str, ...] = (
@@ -253,7 +250,7 @@ class IngestionPipeline:
                 self._embed_builder.apply(batch_nodes)
 
                 # Embed + store
-                await self._embed_and_store(batch_nodes)
+                await self._embed_and_store(batch_nodes, batch_file_nodes)
 
                 # Register files in this batch
                 for file_path_str, nodes in batch_file_nodes.items():
@@ -416,18 +413,46 @@ class IngestionPipeline:
 
     # ── Embedding + storage in ChromaDB ────────────────────────
 
-    async def _embed_and_store(self, nodes: list[TextNode]) -> None:
+    async def _embed_and_store(
+        self,
+        nodes: list[TextNode],
+        file_to_nodes_map: dict[str, list[TextNode]] | None = None,
+    ) -> None:
         """
         Compute embeddings in batches and store chunks in ChromaDB.
         Batching avoids timeouts on large directories.
+
+        Args:
+            nodes: All TextNode objects to embed and store.
+            file_to_nodes_map: Optional mapping of file paths to their nodes for error traceability.
         """
         if not nodes:
             return
 
-        for i in range(0, len(nodes), _EMBED_STORE_BATCH_SIZE):
+        for batch_idx, i in enumerate(range(0, len(nodes), _EMBED_STORE_BATCH_SIZE)):
             batch = nodes[i : i + _EMBED_STORE_BATCH_SIZE]
             texts = [node.text for node in batch]
-            embeddings = await self._embed_model.aget_text_embedding_batch(texts)
+            try:
+                embeddings = await self._embed_model.aget_text_embedding_batch(texts)
+            except Exception as e:
+                # Log detailed chunk information for debugging (RQ-BIN-001)
+                logger.error(
+                    "Embedding failed for batch %d with %d chunks: %s",
+                    batch_idx, len(batch), str(e),
+                )
+                for chunk_idx, node in enumerate(batch):
+                    debug_info = self._get_chunk_debug_info(node, file_to_nodes_map)
+                    # ASCII-encode to avoid UnicodeEncodeError on CP1252 stderr (emoji, etc.)
+                    safe_text = debug_info["text_preview"].encode("ascii", errors="replace").decode("ascii")
+                    logger.error(
+                        "  Chunk %d: %s | bytes=%d | text_preview=%s",
+                        chunk_idx,
+                        debug_info["file_path"],
+                        debug_info["byte_length"],
+                        safe_text,
+                    )
+                raise
+
             ids = [self._make_chunk_id(node) for node in batch]
             metadatas = [self._sanitize_metadata(node.metadata) for node in batch]
 
@@ -441,6 +466,28 @@ class IngestionPipeline:
         logger.info("Stored %d chunks in ChromaDB", len(nodes))
 
     # ── Utilities ───────────────────────────────────────────────
+
+    @staticmethod
+    def _get_chunk_debug_info(
+        node: TextNode,
+        file_to_nodes_map: dict[str, list[TextNode]] | None = None,
+    ) -> dict[str, str]:
+        """
+        Extract debugging information from a TextNode.
+
+        Returns a dict with:
+          - file_path: Source file path from node metadata or 'unknown'
+          - byte_length: Length of node.text in bytes
+          - text_preview: Full text of the node
+        """
+        file_path = node.metadata.get("file_name", "unknown")
+        byte_length = len(node.text.encode("utf-8"))
+
+        return {
+            "file_path": file_path,
+            "byte_length": byte_length,
+            "text_preview": node.text,
+        }
 
     @staticmethod
     def _make_chunk_id(node: TextNode) -> str:

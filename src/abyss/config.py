@@ -85,6 +85,7 @@ _DEFAULT_EXCLUDE_DIRS: list[str] = [
     ".venv",
     ".github",
     ".vscode",
+    ".grepai",
     "Debug",
     "Release",
 ]

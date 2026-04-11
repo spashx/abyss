@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from collections import defaultdict
 from pathlib import Path
 
@@ -9,6 +10,9 @@ from llama_index.core.schema import TextNode
 
 from ..config import EMBED_BUILDER_DEBUG, EMBED_BUILDER_DEBUG_OUTPUT_DIR
 from .metadata import MetadataKeys
+
+# Matches three or more consecutive newlines (i.e. two or more blank lines).
+_MULTI_BLANK_RE = re.compile(r"\n{3,}")
 
 logger = logging.getLogger(__name__)
 
@@ -70,12 +74,14 @@ class EmbedBuilder:
         """
         chunk_type = node.metadata.get(MetadataKeys.CHUNK_TYPE, "")
         if chunk_type == MetadataKeys.CHUNK_TYPE_CODE:
-            return self._build_code(node.text, node.metadata)
+            enriched = self._build_code(node.text, node.metadata)
         elif chunk_type == MetadataKeys.CHUNK_TYPE_DOCUMENT:
-            return self._build_doc(node.text, node.metadata)
+            enriched = self._build_doc(node.text, node.metadata)
         elif chunk_type == MetadataKeys.CHUNK_TYPE_STRUCTURED:
-            return self._build_structured(node.text, node.metadata)
-        return node.text
+            enriched = self._build_structured(node.text, node.metadata)
+        else:
+            enriched = node.text
+        return _MULTI_BLANK_RE.sub("\n\n", enriched)
 
     # ── Debug export ──────────────────────────────────────────────────────────
 
@@ -279,6 +285,13 @@ class EmbedBuilder:
             "      border-right: 1px solid #f0d0a0;",
             "      max-width: 260px;",
             "    }",
+            # ── Enriched text length column ──
+            "    th.col-len { background: #555; }",
+            "    td.col-len {",
+            "      text-align: right; white-space: nowrap;",
+            "      background: #f0f0f0; color: #333;",
+            "      font-variant-numeric: tabular-nums;",
+            "    }",
             # ── Enriched text column ──
             "    th.col-text { background: #333; }",
             "    td.col-text {",
@@ -331,6 +344,7 @@ class EmbedBuilder:
         for col in columns:
             css = _css_class(col)
             lines.append(f'      <th class="{css}">{self._escape_html(col)}</th>')
+        lines.append('      <th class="col-len">len</th>')
         lines.append('      <th class="col-text">enriched_text</th>')
         lines.append("    </tr></thead>")
 
@@ -346,7 +360,8 @@ class EmbedBuilder:
                 val = self._escape_html(str(raw).strip())
                 lines.append(f'        <td class="{css}">{val}</td>')
 
-            # Enriched text cell.
+            # Enriched text length and text cells.
+            lines.append(f'        <td class="col-len">{len(node.text)}</td>')
             lines.append(f'        <td class="col-text">{self._escape_html(node.text)}</td>')
             lines.append("      </tr>")
 
